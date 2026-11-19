@@ -12,6 +12,8 @@ public final class Ledger {
     public static final long MAX_AMOUNT = 999_999_999_999L;
     public static final int MAX_IMPORT_ROWS = 10_000;
     public static final String[] TYPES = {"수입", "지출", "저축", "투자"};
+    /** Input choices; recovery reduces savings rather than adding a fifth statistics group. */
+    public static final String[] INPUT_TYPES = {"수입", "지출", "저축", "투자", "저축회수"};
     public static final class Entry {
         public final String id, date, type, category, memo;
         public final long amount;
@@ -52,7 +54,7 @@ public final class Ledger {
         if(s.equals("저축회수"))return "저축회수";
         if (s.equals("저축") || s.equals("saving") || s.equals("savings")) return "저축";
         if (s.equals("투자") || s.equals("investment") || s.equals("investing")) return "투자";
-        throw new IllegalArgumentException("돈의 성격은 수입, 지출, 저축, 투자 중 하나로 입력하세요.");
+        throw new IllegalArgumentException("돈의 성격은 수입, 지출, 저축, 투자, 저축회수 중 하나로 입력하세요.");
     }
     public static long parseAmount(String value) {
         try {

@@ -66,7 +66,7 @@ public final class XlsxIO {
             sheet.append("</row>");r++;
         }
         sheet.append("</sheetData><autoFilter ref=\"A1:").append(col(headers.length-1)).append(Math.max(1,r-1)).append("\"/>");
-        sheet.append("<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"0\" showDropDown=\"0\" showInputMessage=\"1\" promptTitle=\"돈의 성격 예시\" prompt=\"수입: 월급·이자 / 지출: 식비·교통 / 저축: 예·적금 / 투자: 주식·ETF. 금액은 모두 양수로 입력하면 앱이 유형에 따라 더하거나 차감해요.\" errorStyle=\"stop\" showErrorMessage=\"1\" errorTitle=\"돈의 성격 선택\" error=\"수입, 지출, 저축, 투자 중 하나를 선택하세요.\" sqref=\"E2:E10001\"><formula1>&quot;수입,지출,저축,투자,저축회수&quot;</formula1></dataValidation></dataValidations>");
+        sheet.append("<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"0\" showDropDown=\"0\" showInputMessage=\"1\" promptTitle=\"돈의 성격 예시\" prompt=\"수입: 월급·이자 / 지출: 식비·교통 / 저축: 예·적금 / 투자: 주식·ETF. 저축회수: 기존 저축 원금 반환. 금액은 모두 양수로 입력하세요.\" errorStyle=\"stop\" showErrorMessage=\"1\" errorTitle=\"돈의 성격 선택\" error=\"수입, 지출, 저축, 투자, 저축회수 중 하나를 선택하세요.\" sqref=\"E2:E10001\"><formula1>&quot;수입,지출,저축,투자,저축회수&quot;</formula1></dataValidation></dataValidations>");
         return sheet.append("</worksheet>").toString();
     }
     private static String summarySheet(List<Ledger.Entry> entries) {
@@ -99,27 +99,28 @@ public final class XlsxIO {
         StringBuilder sheet=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><sheetViews><sheetView workbookViewId=\"0\" tabSelected=\"1\" showGridLines=\"0\"/></sheetViews><cols>");
         int[] widths={16,44,26,22,18,24};
         for(int c=0;c<widths.length;c++)sheet.append("<col min=\"").append(c+1).append("\" max=\"").append(c+1).append("\" width=\"").append(widths[c]).append("\" customWidth=\"1\"/>");
-        sheet.append("</cols><sheetData><row r=\"1\" ht=\"30\" customHeight=\"1\">").append(textCell("A1","돈의 성격과 입력 예시",6)).append("</row><row r=\"2\" ht=\"28\" customHeight=\"1\">").append(textCell("A2","금액은 모두 양수로 입력하세요. 앱이 돈의 성격에 따라 수입은 더하고 지출·저축·투자는 차감해요.",0)).append("</row><row r=\"3\" ht=\"28\" customHeight=\"1\">").append(textCell("A3","참고용 예시는 앱에 추가하지 않아요. 실제 기록은 ‘내역’ 시트의 2행부터 입력하세요.",0)).append("</row>");
+        sheet.append("</cols><sheetData><row r=\"1\" ht=\"30\" customHeight=\"1\">").append(textCell("A1","돈의 성격과 입력 예시",6)).append("</row><row r=\"2\" ht=\"28\" customHeight=\"1\">").append(textCell("A2","금액은 모두 양수로 입력하세요. 앱이 돈의 성격에 따라 수입·저축회수는 더하고 지출·저축·투자는 차감해요.",0)).append("</row><row r=\"3\" ht=\"28\" customHeight=\"1\">").append(textCell("A3","참고용 예시는 앱에 추가하지 않아요. 실제 기록은 ‘내역’ 시트의 2행부터 입력하세요.",0)).append("</row>");
         String[] headings={"돈의 성격","뜻","상세 분류 예","앱 반영"};
         sheet.append("<row r=\"4\" ht=\"28\" customHeight=\"1\">");for(int c=0;c<headings.length;c++)sheet.append(textCell(col(c)+"4",headings[c],1));sheet.append("</row>");
-        String[][] meanings={{"수입","월급·상여금·이자처럼 받은 돈","월급, 상여금, 이자","더함 (+)"},{"지출","식사·교통·월세처럼 생활에 쓴 돈","식비, 교통, 월세","차감 (-)"},{"저축","예·적금·청약 등에 따로 모은 돈","적금, 예금, 청약","차감 (-)"},{"투자","주식·ETF·펀드 매수·납입에 쓴 돈","주식, ETF, 펀드","차감 (-)"}};
+        String[][] meanings={{"수입","월급·상여금·이자처럼 받은 돈","월급, 상여금, 이자","더함 (+)"},{"지출","식사·교통·월세처럼 생활에 쓴 돈","식비, 교통, 월세","차감 (-)"},{"저축","예·적금·청약 등에 따로 모은 돈","적금, 예금, 청약","차감 (-)"},{"투자","주식·ETF·펀드 매수·납입에 쓴 돈","주식, ETF, 펀드","차감 (-)"},{"저축회수","기록한 저축 원금을 돌려받은 돈","기존 저축과 같은 분류","순저축 차감, 사용 가능 더함"}};
         for(int i=0;i<meanings.length;i++){int r=i+5;sheet.append("<row r=\"").append(r).append("\" ht=\"26\" customHeight=\"1\">");for(int c=0;c<4;c++)sheet.append(textCell(col(c)+r,meanings[i][c],0));sheet.append("</row>");}
-        sheet.append("<row r=\"10\" ht=\"28\" customHeight=\"1\">").append(textCell("A10","입력 예시 8건 (참고용)",6)).append("</row><row r=\"11\" ht=\"28\" customHeight=\"1\">");for(int c=0;c<BACKUP_HEADERS.length;c++)sheet.append(textCell(col(c)+"11",BACKUP_HEADERS[c],1));sheet.append("</row>");
-        String[][] samples={{"2026-11-01","11월 급여","월급","수입","3000000"},{"2026-11-02","예금 이자","이자","수입","5000"},{"2026-11-03","점심 식사","식비","지출","12500"},{"2026-11-04","버스 요금","교통","지출","1500"},{"2026-11-05","정기 적금 납입","적금","저축","700000"},{"2026-11-06","주택 청약 납입","청약","저축","100000"},{"2026-11-07","ETF 정기 매수","ETF","투자","400000"},{"2026-11-08","주식 매수","주식","투자","100000"}};
+        sheet.append("<row r=\"10\" ht=\"28\" customHeight=\"1\">").append(textCell("A10","입력 예시 9건 (참고용)",6)).append("</row><row r=\"11\" ht=\"28\" customHeight=\"1\">");for(int c=0;c<BACKUP_HEADERS.length;c++)sheet.append(textCell(col(c)+"11",BACKUP_HEADERS[c],1));sheet.append("</row>");
+        String[][] samples={{"2026-11-01","11월 급여","월급","수입","3000000"},{"2026-11-02","예금 이자","이자","수입","5000"},{"2026-11-03","점심 식사","식비","지출","12500"},{"2026-11-04","버스 요금","교통","지출","1500"},{"2026-11-05","정기 적금 납입","적금","저축","700000"},{"2026-11-06","주택 청약 납입","청약","저축","100000"},{"2026-11-07","ETF 정기 매수","ETF","투자","400000"},{"2026-11-08","주식 매수","주식","투자","100000"},{"2026-11-09","기록한 적금 원금 회수","적금","저축회수","700000"}};
         for(int i=0;i<samples.length;i++){String[] sample=samples[i];int r=i+12;Ledger.Entry entry=new Ledger.Entry("",sample[0],sample[3],Long.parseLong(sample[4]),sample[2],sample[1],0);sheet.append("<row r=\"").append(r).append("\" ht=\"25\" customHeight=\"1\">").append(numberCell("A"+r,Long.toString(excelSerial(LocalDate.parse(entry.date))),2)).append(textCell("B"+r,entry.memo,0)).append(textCell("C"+r,entry.category,0)).append(numberCell("D"+r,Long.toString(entry.amount),3)).append(textCell("E"+r,entry.type,0)).append(textCell("F"+r,"",0)).append("</row>");}
         return sheet.append("<row r=\"21\" ht=\"28\" customHeight=\"1\">").append(textCell("A21","새 내역의 고유ID는 비워 두세요. 저축·투자는 지출 합계와 별도로 집계해요.",0)).append("</row></sheetData></worksheet>").toString();
     }
     private static String guideSheet(boolean template) {
         String[] notes={"차곡가계부 엑셀 사용 안내", "내역 시트의 첫 번째 행은 바꾸지 말고, 두 번째 행부터 입력하세요.",
             "돈의 성격과 상세 분류는 별도 열이에요. 예: 수입 / 월급, 투자 / 주식.",
-            "E열 돈의 성격 셀을 선택한 뒤 드롭다운에서 수입·지출·저축·투자 중 하나를 고르세요.",
+            "E열 돈의 성격 셀을 선택한 뒤 드롭다운에서 수입·지출·저축·투자·저축회수 중 하나를 고르세요.",
             "수입: 월급·상여금·예금 이자처럼 받은 돈이에요. 사용 가능 금액에 더해요.",
             "지출: 식사·교통·월세처럼 생활에 쓴 돈이에요. 사용 가능 금액에서 차감해요.",
             "저축: 예·적금·청약 등에 따로 모은 돈이에요. 사용 가능 금액에서 차감해요.",
             "투자: 주식·ETF·펀드 매수·납입에 쓴 돈이에요. 사용 가능 금액에서 차감해요.",
-            template?"입력예시 시트에 뜻과 예시 8건이 있어요. 예시는 앱으로 가져오지 않아요.":"이 파일의 내역 시트에는 실제 백업 기록만 들어 있어요.",
+            "저축회수: 이미 기록한 저축 원금을 돌려받을 때 선택하세요. 기존 저축과 같은 상세 분류로 입력하고 이자·지원금은 수입으로 따로 적으세요. 순저축에서 빼고 사용 가능 금액에 더해요.",
+            template?"입력예시 시트에 뜻과 예시 9건이 있어요. 예시는 앱으로 가져오지 않아요.":"이 파일의 내역 시트에는 실제 백업 기록만 들어 있어요.",
             "날짜: YYYY-MM-DD 문자 또는 엑셀 날짜 셀. 분류와 메모는 생략할 수 있어요.",
-            "금액은 모두 양수로 입력하세요. 앱이 돈의 성격에 따라 수입은 더하고 지출·저축·투자는 차감해요.",
+            "금액은 모두 양수로 입력하세요. 앱이 돈의 성격에 따라 수입·저축회수는 더하고 지출·저축·투자는 차감해요.",
             "예전 지출·저축·투자의 음수 금액도 읽어요. 백업 파일은 유형별 부호를 자동 표시해요.",
             "금액 절댓값은 1~999,999,999,999원의 정수예요.",
             "새 내역의 고유ID는 비워 두세요. 백업 ID는 복원 시 중복·충돌을 확인하는 데 사용해요.",

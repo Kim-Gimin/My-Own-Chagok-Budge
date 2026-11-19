@@ -241,7 +241,7 @@ public final class CoreTests {
                 Map<String,String> supplied=unzip(Files.readAllBytes(Paths.get(args[1])));
                 eq(true,supplied.get("xl/workbook.xml").contains("입력예시"));
                 eq(true,supplied.get("xl/worksheets/sheet1.xml").contains("showInputMessage=\"1\""));
-                eq(true,supplied.get("xl/worksheets/sheet3.xml").contains("입력 예시 8건"));
+                eq(true,supplied.get("xl/worksheets/sheet3.xml").contains("입력 예시 9건"));
             }
         }
         StatisticsData.Summary stats=StatisticsData.aggregate(data,"지출");eq(500000L,stats.total);eq(1,stats.categories.size());eq(100.0,stats.percent(500000));

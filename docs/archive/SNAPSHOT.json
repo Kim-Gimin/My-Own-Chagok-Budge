@@ -1,11 +1,11 @@
 {
-  "version": "0.8.1",
-  "code": 15,
+  "version": "0.8.2",
+  "code": 16,
   "variant": "",
-  "tag": "v0.8.1",
-  "source": "업데이트전_보관/2026-11-16_저축회수입력_01/project-before.zip",
-  "source_sha256": "5a0affb5a3dedf56f3aa6ab780515c20895e3fd96f5ea71d639650de731025c6",
-  "files": 68,
+  "tag": "v0.8.2",
+  "source": "chagok-source-0.8.2.zip",
+  "source_sha256": "f17bb52bd3300acf581b970b6e2f7e77fb946b695d5bf3b86c4d275df81d67f1",
+  "files": 69,
   "excluded": [
     "local-test.keystore"
   ],

@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory=$true)][string]$BuildTools,
     [Parameter(Mandatory=$true)][string]$Adb,
     [Parameter(Mandatory=$true)][string]$Serial,
-    [ValidateSet('full','upgrade','preview','revision','history','overlay','workflow','iconbaseline','icon','settings','investment','comparison','consistency','planning')][string]$Mode='full'
+    [ValidateSet('full','upgrade','preview','revision','history','overlay','workflow','iconbaseline','icon','settings','investment','comparison','consistency','planning','recovery','recoverybaseline','recoveryupgrade')][string]$Mode='full'
 )
 $ErrorActionPreference='Stop'
 if($Serial -notmatch '^emulator-\d+$'){throw 'Use a disposable Android emulator. These tests reset this app database.'}
