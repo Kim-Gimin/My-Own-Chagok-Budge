@@ -1,0 +1,2 @@
+INSTRUMENTATION_RESULT: result=PASS: 9 Android integration checks
+INSTRUMENTATION_CODE: -1

@@ -1,0 +1,9 @@
+PASS: 536 checks (including 10,000-row Korean XLSX roundtrip and category statistics)
+PASS: 138 planning/backup checks
+PASS: 157 maturity/allocation checks
+PASS: 26 recovery checks
+PASS: 51 opening asset checks
+PASS: 28 asset consistency checks
+PASS: 45 living-budget selection/backup checks
+PASS: 68 category normalization/calendar checks
+PASS: 54 planning XLSX roundtrip/validation checks
