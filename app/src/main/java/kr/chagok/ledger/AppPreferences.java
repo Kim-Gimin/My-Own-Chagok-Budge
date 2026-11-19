@@ -3,6 +3,7 @@ package kr.chagok.ledger;
 import android.content.*;
 import android.graphics.Typeface;
 import java.util.*;
+import java.time.*;
 
 final class AppPreferences {
     private final Context context;private final SharedPreferences prefs;
@@ -17,6 +18,11 @@ final class AppPreferences {
     Typeface typeface(String id){try{if("gothic".equals(id))return Typeface.createFromAsset(context.getAssets(),"fonts/NanumGothic-Regular.ttf");if("serif".equals(id))return Typeface.createFromAsset(context.getAssets(),"fonts/NanumMyeongjo-Regular.ttf");}catch(Exception ignored){}return Typeface.DEFAULT;}
     Set<String> homeMetrics(){return new HashSet<>(prefs.getStringSet("home_metrics",OverviewData.DEFAULT_METRICS));}
     void homeMetrics(Set<String> values){prefs.edit().putStringSet("home_metrics",new HashSet<>(values)).commit();}
+    int statisticsMode(){int mode=prefs.getInt("statistics_mode",0);return mode>=0&&mode<=3?mode:0;}
+    int statisticsYear(){return Math.max(1900,Math.min(9999,prefs.getInt("statistics_year",LocalDate.now().getYear())));}
+    YearMonth statisticsMonth(){try{return YearMonth.parse(prefs.getString("statistics_month",YearMonth.now().toString()));}catch(Exception e){return YearMonth.now();}}
+    LocalDate statisticsDate(boolean start){try{return LocalDate.parse(prefs.getString(start?"statistics_from":"statistics_to",(start?LocalDate.now().withDayOfMonth(1):LocalDate.now()).toString()));}catch(Exception e){return start?LocalDate.now().withDayOfMonth(1):LocalDate.now();}}
+    void statistics(int mode,YearMonth month,int year,LocalDate from,LocalDate to){prefs.edit().putInt("statistics_mode",mode).putString("statistics_month",month.toString()).putInt("statistics_year",year).putString("statistics_from",from.toString()).putString("statistics_to",to.toString()).commit();}
     boolean hasPin(){return !pinHash().isEmpty();}
     private String pinHash(){return prefs.getString("pin_hash","");}
     void setPinHash(String hash){prefs.edit().putString("pin_hash",hash).putInt("pin_failures",0).putLong("pin_until",0).commit();}

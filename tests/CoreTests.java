@@ -26,6 +26,16 @@ public final class CoreTests {
     }
     private static byte[] zip(Map<String,String> parts)throws Exception {ByteArrayOutputStream out=new ByteArrayOutputStream();try(ZipOutputStream z=new ZipOutputStream(out)){for(Map.Entry<String,String> p:parts.entrySet()){z.putNextEntry(new ZipEntry(p.getKey()));z.write(p.getValue().getBytes(StandardCharsets.UTF_8));z.closeEntry();}}return out.toByteArray();}
     private static XlsxIO.ReadResult read(byte[] bytes)throws Exception{return XlsxIO.read(new ByteArrayInputStream(bytes));}
+    private static void periodChecks()throws Exception{
+        LocalDate today=LocalDate.of(2026,10,29);YearMonth month=YearMonth.of(2024,2);
+        StatisticsPeriod feb=StatisticsPeriod.of(0,month,2026,today,today,today);eq(LocalDate.of(2024,2,1),feb.from);eq(LocalDate.of(2024,2,29),feb.to);eq(true,feb.contains(LocalDate.of(2024,2,29)));eq(false,feb.contains(LocalDate.of(2024,3,1)));
+        StatisticsPeriod year=StatisticsPeriod.of(1,month,2025,today,today,today);eq(LocalDate.of(2025,1,1),year.from);eq(LocalDate.of(2025,12,31),year.to);
+        StatisticsPeriod ytd=StatisticsPeriod.of(2,month,2025,today,today,today);eq(LocalDate.of(2026,1,1),ytd.from);eq(today,ytd.to);eq(false,ytd.contains(today.plusDays(1)));eq(false,ytd.contains(LocalDate.of(2025,12,31)));
+        LocalDate start=LocalDate.of(2025,12,31),end=LocalDate.of(2026,1,1);StatisticsPeriod custom=StatisticsPeriod.of(3,month,2025,start,end,today);eq(true,custom.contains(start));eq(true,custom.contains(end));eq(false,custom.contains(end.plusDays(1)));
+        List<Ledger.Entry> entries=Arrays.asList(entry("a",start.minusDays(1).toString(),"지출",1),entry("b",start.toString(),"지출",2),entry("c",end.toString(),"저축",3),entry("d",end.plusDays(1).toString(),"수입",4));eq(2,custom.entries(entries).size());eq(-5L,Ledger.available(Ledger.totals(custom.entries(entries))));
+        eq(1,StatisticsPeriod.of(3,month,2026,end,end,today).entries(entries).size());eq(0,custom.entries(Collections.emptyList()).size());rejects(()->StatisticsPeriod.of(3,month,2026,end,start,today));rejects(()->StatisticsPeriod.of(4,month,2026,start,end,today));rejects(()->StatisticsPeriod.of(1,month,1899,start,end,today));
+        eq(LocalDate.of(9999,12,31),StatisticsPeriod.of(1,month,9999,start,end,today).to);eq(LocalDate.of(1900,1,1),StatisticsPeriod.of(1,month,1900,start,end,today).from);
+    }
     private static void overviewChecks()throws Exception{
         List<Ledger.Entry> entries=Arrays.asList(entry("a","2025-12-31","수입",1000),entry("b","2026-01-01","저축",100),entry("c","2026-01-02","지출",50),entry("d","2026-01-04","수입",500),entry("e","2026-01-05","지출",20),entry("f","2026-02-01","지출",30));
         OverviewData.Settlement all=OverviewData.settle(entries,null,null);eq(3,all.months.size());eq(YearMonth.of(2026,2),all.months.get(0).month);eq(1300L,all.balance());
@@ -34,6 +44,7 @@ public final class CoreTests {
     }
     public static void main(String[] args)throws Exception {
         overviewChecks();
+        periodChecks();
         String hash=PinCrypto.create("0842");eq(true,PinCrypto.verify("0842",hash));eq(false,PinCrypto.verify("842",hash));eq(false,PinCrypto.verify("9999",hash));eq(false,PinCrypto.verify("0842","bad"));eq(false,hash.equals(PinCrypto.create("0842")));rejects(()->PinCrypto.create("12"));rejects(()->PinCrypto.create("abcd"));
         eq("2024-02-29",Ledger.normalizeDate("2024/2/29")); eq("2026-10-27",Ledger.normalizeDate("20261027"));
         eq("2026-10-27",Ledger.normalizeDate("2026-10-27T00:00:00.000Z"));

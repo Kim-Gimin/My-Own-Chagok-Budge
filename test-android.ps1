@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory=$true)][string]$AndroidJar,
     [Parameter(Mandatory=$true)][string]$BuildTools,
     [Parameter(Mandatory=$true)][string]$Adb,
-    [Parameter(Mandatory=$true)][string]$Serial
+    [Parameter(Mandatory=$true)][string]$Serial,
+    [ValidateSet('full','upgrade','preview','revision')][string]$Mode='full'
 )
 $ErrorActionPreference='Stop'
 if($Serial -notmatch '^emulator-\d+$'){throw 'Use a disposable Android emulator. These tests reset this app database.'}
@@ -21,6 +22,9 @@ Run-Checked "$Jdk\bin\java.exe" @('-jar',"$BuildTools\lib\apksigner.jar",'sign',
 $taskApk=(Get-ChildItem -LiteralPath "$taskOut\app" -Filter 'chagok-*.apk' | Select-Object -First 1).FullName
 Run-Checked $Adb @('-s',$Serial,'install','-r',$taskApk)
 Run-Checked $Adb @('-s',$Serial,'install','-r',"$taskOut\tests\tests.apk")
-$taskResult=& $Adb -s $Serial shell am instrument -w kr.chagok.ledger.tests/kr.chagok.ledger.DeviceChecks
+$taskInstrumentArgs=@('-s',$Serial,'shell','am','instrument','-w')
+if($Mode -ne 'full'){$taskInstrumentArgs+=@('-e','mode',$Mode)}
+$taskInstrumentArgs+='kr.chagok.ledger.tests/kr.chagok.ledger.DeviceChecks'
+$taskResult=& $Adb @taskInstrumentArgs
 $taskResult
 if(($taskResult -join "`n") -notmatch 'PASS: \d+ Android integration checks'){throw 'Android integration tests failed'}
