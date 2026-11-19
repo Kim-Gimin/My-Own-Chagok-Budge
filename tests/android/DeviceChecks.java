@@ -24,13 +24,14 @@ public class DeviceChecks extends Instrumentation {
     }
     void runUpgradeChecks()throws Exception {
         Context ctx=getTargetContext(); LedgerDb db=new LedgerDb(ctx);
-        eq(5,db.all().size());eq(1976000L,Ledger.available(Ledger.totals(db.all())));db.close();
-        eq("0.2.0",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
+        eq(6,db.all().size());eq(1975877L,Ledger.available(Ledger.totals(db.all())));db.close();
+        eq("0.3.0",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
         eq(true,new CategoryStore(ctx).choices("지출",Collections.emptyList()).contains("반려동물 병원"));
     }
     void runChecks()throws Exception {
         Context ctx=getTargetContext();ctx.deleteDatabase("chagok.db");LedgerDb db=new LedgerDb(ctx);
         ctx.getSharedPreferences("category_choices",Context.MODE_PRIVATE).edit().clear().commit();
+        ctx.getSharedPreferences("app_preferences",Context.MODE_PRIVATE).edit().clear().commit();
         List<Ledger.Entry> seed=Arrays.asList(new Ledger.Entry("i","2026-10-01","수입",3000000,"월급","10월 급여",2),new Ledger.Entry("e","2026-10-27","지출",12500,"식비","점심 식사",3),new Ledger.Entry("s","2026-10-05","저축",1000000,"적금","차곡차곡 모으기",4));
         Ledger.ImportPlan p=db.importAtomic(seed);eq(3,p.additions.size());eq(3,db.all().size());
         p=db.importAtomic(seed);eq(3,p.duplicates);eq(3,db.all().size());
@@ -83,8 +84,34 @@ public class DeviceChecks extends Instrumentation {
         categoryUiChecks(app);
         calendarUiChecks(app);
         statisticsUiChecks(app);
+        featureUiChecks(app);
         runOnMainSync(()->a.finish());waitForIdleSync();
     }
+    void navigate(MainActivity app,int tab)throws Exception{runOnMainSync(()->{try{set(app,"tab",tab);invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();}
+    void featureUiChecks(MainActivity app)throws Exception{
+        Context ctx=getTargetContext();AppPreferences prefs=new AppPreferences(ctx);LedgerDb data=new LedgerDb(ctx);List<Ledger.Entry> extras=Arrays.asList(new Ledger.Entry("travel-1","2026-10-11","지출",20000,"여행","기차표",0),new Ledger.Entry("travel-2","2026-10-21","지출",40000,"여행","숙박",0),new Ledger.Entry("travel-old","2026-09-11","지출",30000,"여행","이전 달 제외",0),new Ledger.Entry("travel-income","2026-10-21","수입",50000,"여행","수입 제외",0));data.importAtomic(extras);data.close();
+        runOnMainSync(()->{try{set(app,"month",YearMonth.of(2026,10));set(app,"statisticsType",1);}catch(Exception e){throw new RuntimeException(e);}});navigate(app,2);
+        DonutChartView chart=(DonutChartView)findViewClass(app.getWindow().getDecorView(),DonutChartView.class);eq(true,chart!=null);
+        float before=chart.rotationDegrees();runOnMainSync(()->{long now=SystemClock.uptimeMillis();float r=Math.min(chart.getWidth()*.39f,chart.getHeight()*.46f)*.8f,cx=chart.getWidth()/2f,cy=chart.getHeight()/2f;touch(chart,now,now,0,cx+r,cy);for(int i=1;i<=6;i++){double angle=Math.toRadians(i*12);touch(chart,now,now+i*20,2,cx+r*(float)Math.cos(angle),cy+r*(float)Math.sin(angle));}touch(chart,now,now+125,1,cx+r*(float)Math.cos(Math.toRadians(72)),cy+r*(float)Math.sin(Math.toRadians(72)));});Thread.sleep(900);waitForIdleSync();eq(true,Math.abs(chart.rotationDegrees()-before)>30);screenshot(ctx,"chart-rotated");
+        runOnMainSync(()->{long now=SystemClock.uptimeMillis();float r=Math.min(chart.getWidth()*.39f,chart.getHeight()*.46f)*.8f;double angle=Math.toRadians(chart.rotationDegrees()+60000*180.0/77000);float x=chart.getWidth()/2f+r*(float)Math.cos(angle),y=chart.getHeight()/2f+r*(float)Math.sin(angle);touch(chart,now,now,0,x,y);touch(chart,now,now+50,1,x,y);});waitForIdleSync();
+        eq(true,activeText("여행 지출 내역"));eq(true,activeText("2026년 10월 · 2건 · 60,000원"));eq(true,activeText("기차표"));eq(true,activeText("숙박"));eq(false,activeText("이전 달 제외"));eq(false,activeText("수입 제외"));screenshot(ctx,"category-popup");clickAncestor("기차표");waitForIdleSync();eq(true,activeText("기록 수정"));List<AccessibilityNodeInfo> popupFields=new ArrayList<>();collectEdits(getUiAutomation().getRootInActiveWindow(),popupFields);eq("20000",popupFields.get(0).getText().toString());eq("2026-10-11",popupFields.get(1).getText().toString());eq("여행",popupFields.get(2).getText().toString());clickText("취소");waitForIdleSync();
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"여행 60,000원").performClick());waitForIdleSync();eq(true,activeText("여행 지출 내역"));clickText("닫기");
+        data=new LedgerDb(ctx);for(Ledger.Entry e:extras)data.delete(e.id);data.close();
+        navigate(app,4);eq(true,findDesc(app.getWindow().getDecorView(),"연간 결산").isSelected());eq(true,findDesc(app.getWindow().getDecorView(),"총 합계 1,975,877원")!=null);runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"이전 해").performClick());waitForIdleSync();eq(true,findDesc(app.getWindow().getDecorView(),"총 합계 0원")!=null);runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"종합 결산").performClick());waitForIdleSync();eq(true,findDesc(app.getWindow().getDecorView(),"총 합계 1,975,877원")!=null);
+        runOnMainSync(()->{try{set(app,"periodFrom",YearMonth.of(2026,9));set(app,"periodTo",YearMonth.of(2026,10));}catch(Exception e){throw new RuntimeException(e);}findDesc(app.getWindow().getDecorView(),"기간 결산").performClick();});waitForIdleSync();eq(true,findDesc(app.getWindow().getDecorView(),"총 합계 1,976,000원")!=null);runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"결산 기간 선택").performClick());waitForIdleSync();eq(true,activeText("기간 선택"));screenshot(ctx,"period-picker");clickText("확인");waitForIdleSync();screenshot(ctx,"settlement");
+        navigate(app,5);eq(true,findDesc(app.getWindow().getDecorView(),"전체 합계 : 1,975,877원")!=null);navigate(app,6);runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"홈 화면 커스텀").performClick());waitForIdleSync();clickText("오늘 저축");clickText("저장");waitForIdleSync();eq(true,prefs.homeMetrics().contains("today_2"));runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"홈 화면 커스텀").performClick());waitForIdleSync();clickText("오늘 저축");clickText("취소");waitForIdleSync();eq(true,prefs.homeMetrics().contains("today_2"));
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"시작 화면 설정").performClick());waitForIdleSync();clickText("홈 화면");clickText("확인");waitForIdleSync();eq(5,prefs.startTab());
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"폰트 설정").performClick());waitForIdleSync();clickText("나눔고딕");clickText("저장");waitForIdleSync();eq("gothic",prefs.fontId());try(InputStream font=ctx.getAssets().open("fonts/NanumGothic-Regular.ttf")){eq(true,font.available()>1000000);}
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"다크 모드").performClick());waitForIdleSync();eq(true,prefs.dark());screenshot(ctx,"settings-dark");navigate(app,0);screenshot(ctx,"calendar-dark");navigate(app,2);screenshot(ctx,"statistics-dark");navigate(app,5);screenshot(ctx,"home-dark");
+        runOnMainSync(()->app.finish());waitForIdleSync();MainActivity reopened=(MainActivity)startActivitySync(new Intent(ctx,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();eq(true,findDesc(reopened.getWindow().getDecorView(),"홈 탭").isSelected());eq(true,new AppPreferences(ctx).dark());eq("gothic",new AppPreferences(ctx).fontId());
+        navigate(reopened,6);runOnMainSync(()->findDesc(reopened.getWindow().getDecorView(),"비밀번호 설정").performClick());waitForIdleSync();List<AccessibilityNodeInfo> fields=new ArrayList<>();collectEdits(getUiAutomation().getRootInActiveWindow(),fields);eq(2,fields.size());setText(fields.get(0),"0842");setText(fields.get(1),"0842");clickText("저장");Thread.sleep(1800);waitForIdleSync();eq(true,prefs.hasPin());runOnMainSync(()->reopened.finish());waitForIdleSync();
+        MainActivity locked=(MainActivity)startActivitySync(new Intent(ctx,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();eq(true,activeText("차곡가계부 잠금"));fields.clear();collectEdits(getUiAutomation().getRootInActiveWindow(),fields);eq(1,fields.size());setText(fields.get(0),"9999");clickText("잠금 해제");Thread.sleep(1200);waitForIdleSync();eq(true,activeText("비밀번호가 맞지 않아요."));eq(false,activeText("전체 합계"));setText(fields.get(0),"0842");clickText("잠금 해제");Thread.sleep(1200);waitForIdleSync();eq(false,activeText("차곡가계부 잠금"));eq(true,findDesc(locked.getWindow().getDecorView(),"홈 탭").isSelected());
+        navigate(locked,6);runOnMainSync(()->findDesc(locked.getWindow().getDecorView(),"비밀번호 잠금 해제").performClick());waitForIdleSync();fields.clear();collectEdits(getUiAutomation().getRootInActiveWindow(),fields);setText(fields.get(0),"0842");clickText("확인");Thread.sleep(1200);waitForIdleSync();eq(false,prefs.hasPin());runOnMainSync(()->findDesc(locked.getWindow().getDecorView(),"다크 모드").performClick());waitForIdleSync();eq(false,prefs.dark());data=new LedgerDb(ctx);eq(6,data.all().size());eq(1975877L,Ledger.available(Ledger.totals(data.all())));data.close();runOnMainSync(()->locked.finish());waitForIdleSync();
+    }
+    void clickAncestor(String text){for(AccessibilityNodeInfo node:getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText(text))if(node.getText()!=null&&text.contentEquals(node.getText())){while(node!=null&&!node.isClickable())node=node.getParent();if(node!=null){eq(true,node.performAction(AccessibilityNodeInfo.ACTION_CLICK));return;}}throw new AssertionError("No clickable ancestor for "+text);}
+    boolean activeText(String text){for(AccessibilityNodeInfo node:getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText(text))if(node.getText()!=null&&text.contentEquals(node.getText()))return true;return false;}
+    View findViewClass(View v,Class<?> type){if(type.isInstance(v))return v;if(v instanceof ViewGroup){ViewGroup g=(ViewGroup)v;for(int i=0;i<g.getChildCount();i++){View found=findViewClass(g.getChildAt(i),type);if(found!=null)return found;}}return null;}
+    void touch(View view,long down,long time,int action,float x,float y){MotionEvent event=MotionEvent.obtain(down,time,action,x,y,0);view.dispatchTouchEvent(event);event.recycle();}
     void statisticsUiChecks(MainActivity app)throws Exception {
         runOnMainSync(()->{try{set(app,"month",YearMonth.of(2026,10));set(app,"statisticsType",1);set(app,"tab",2);invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
         eq(true,findDesc(app.getWindow().getDecorView(),"지출 분류별 원형 차트, 합계 17,000원, 2개 분류")!=null);
@@ -108,15 +135,22 @@ public class DeviceChecks extends Instrumentation {
     void statisticsPreview()throws Exception {
         Thread.sleep(5000);
         Context ctx=getTargetContext();ctx.deleteDatabase("chagok.db");LedgerDb db=new LedgerDb(ctx);
+        ctx.getSharedPreferences("app_preferences",Context.MODE_PRIVATE).edit().clear().commit();
         String[] names={"용돈","여행","옷","회사식비","데이트","친구 만남","선물","교통비","책·교육","편의점","이름이 긴 분류도 목록에서 자세하게 확인할 수 있어요"};
         long[] amounts={500000,377500,345800,251600,238550,168200,83000,49000,33600,24900,2000};
         List<Ledger.Entry> seed=new ArrayList<>();for(int i=0;i<names.length;i++)seed.add(new Ledger.Entry("preview-expense-"+i,"2026-10-27","지출",amounts[i],names[i],"화면 확인용 예시",0));
         seed.add(new Ledger.Entry("preview-i1","2026-10-01","수입",3000000,"월급","",0));seed.add(new Ledger.Entry("preview-i2","2026-10-15","수입",500000,"부수입","",0));seed.add(new Ledger.Entry("preview-i3","2026-10-20","수입",200000,"용돈","",0));
-        seed.add(new Ledger.Entry("preview-s1","2026-10-05","저축",1000000,"적금","",0));seed.add(new Ledger.Entry("preview-s2","2026-10-10","저축",500000,"청약","",0));seed.add(new Ledger.Entry("preview-s3","2026-10-15","저축",300000,"비상금","",0));db.importAtomic(seed);db.close();
+        seed.add(new Ledger.Entry("preview-s1","2026-10-05","저축",1000000,"적금","",0));seed.add(new Ledger.Entry("preview-s2","2026-10-10","저축",500000,"청약","",0));seed.add(new Ledger.Entry("preview-s3","2026-10-15","저축",300000,"비상금","",0));
+        for(int m=1;m<=9;m++){String date=LocalDate.of(2026,m,15).toString();seed.add(new Ledger.Entry("previous-i"+m,date,"수입",3000000+m*10000,"월급","",0));seed.add(new Ledger.Entry("previous-e"+m,date,"지출",1800000+m*25000,"생활비","",0));seed.add(new Ledger.Entry("previous-s"+m,date,"저축",500000,"적금","",0));}db.importAtomic(seed);db.close();
         Activity app=startActivitySync(new Intent(ctx,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
         for(int type:new int[]{1,0,2}){
             runOnMainSync(()->{try{set(app,"tab",2);set(app,"statisticsType",type);set(app,"month",YearMonth.of(2026,10));invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();screenshot(ctx,type==1?"stats-expense":type==0?"stats-income":"stats-saving");
         }
+        runOnMainSync(()->{try{set(app,"statisticsType",1);invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"여행 377,500원").performClick());waitForIdleSync();screenshot(ctx,"travel-popup-light");clickText("닫기");
+        runOnMainSync(()->{new AppPreferences(ctx).dark(true);try{invoke(app,"applyAppearance");invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();screenshot(ctx,"stats-dark-preview");
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"여행 377,500원").performClick());waitForIdleSync();screenshot(ctx,"travel-popup-dark");clickText("닫기");
+        navigate((MainActivity)app,4);screenshot(ctx,"settlement-dark-preview");runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"기간 결산").performClick());waitForIdleSync();runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"결산 기간 선택").performClick());waitForIdleSync();screenshot(ctx,"period-dark-preview");clickText("취소");
+        navigate((MainActivity)app,5);screenshot(ctx,"home-dark-preview");navigate((MainActivity)app,6);screenshot(ctx,"settings-dark-preview");runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"홈 화면 커스텀").performClick());waitForIdleSync();screenshot(ctx,"home-custom-dark-preview");clickText("취소");runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"시작 화면 설정").performClick());waitForIdleSync();screenshot(ctx,"start-dark-preview");clickText("취소");runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"폰트 설정").performClick());waitForIdleSync();screenshot(ctx,"font-dark-preview");clickText("취소");navigate((MainActivity)app,0);screenshot(ctx,"calendar-dark-preview");runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"2026-10-27 새 기록").performClick());waitForIdleSync();screenshot(ctx,"entry-dark-preview");clickText("취소");
         runOnMainSync(()->app.finish());waitForIdleSync();
     }
     void calendarUiChecks(MainActivity app)throws Exception {

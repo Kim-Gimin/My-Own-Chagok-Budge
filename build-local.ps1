@@ -28,6 +28,8 @@ try {
     $taskManifest.manifest.SetAttribute('package','kr.chagok.ledger')
     $taskManifest.Save("$taskBuildOutput\AndroidManifest.xml")
     Run-Checked "$taskToolsPath\aapt2.exe" @('link','-o',"$taskBuildOutput\unsigned.apk",'--manifest',"$taskBuildOutput\AndroidManifest.xml",'-I',$taskPlatformJar,'--min-sdk-version','26','--target-sdk-version','36','--version-code',$taskVersionCode,'--version-name',$taskVersionName,"$taskBuildOutput\resources.zip")
+    # jar normalizes nested asset names to '/' on Windows; aapt2 -A may retain '\'.
+    Run-Checked "$Jdk\bin\jar.exe" @('--update','--file',"$taskBuildOutput\unsigned.apk",'-C',"$PSScriptRoot\app\src\main",'assets')
     Run-Checked "$Jdk\bin\jar.exe" @('--create','--file',"$taskBuildOutput\classes.jar",'-C',"$taskBuildOutput\classes",'.')
     Run-Checked "$Jdk\bin\java.exe" @('-cp',"$taskToolsPath\lib\d8.jar",'com.android.tools.r8.D8','--lib',$taskPlatformJar,'--min-api','26','--output',"$taskBuildOutput\dex", "$taskBuildOutput\classes.jar")
     Run-Checked "$Jdk\bin\jar.exe" @('--update','--file',"$taskBuildOutput\unsigned.apk",'-C',"$taskBuildOutput\dex",'classes.dex')
