@@ -24,16 +24,19 @@ public final class XlsxIO {
         public final List<OpeningAsset> openingAssets=new ArrayList<>();
         public final List<String> errors = new ArrayList<>();
         public int invalidRows;
+        PlanningData planning; // Present only when all four planning sheets were validated.
     }
-    public static void write(OutputStream output,List<Ledger.Entry> input,boolean template)throws IOException {writeInternal(output,input,template,Collections.emptyList(),false);}
-    public static void write(OutputStream output,List<Ledger.Entry> input,boolean template,List<OpeningAsset> opening)throws IOException {writeInternal(output,input,template,opening,true);}
-    private static void writeInternal(OutputStream output,List<Ledger.Entry> input,boolean template,List<OpeningAsset> opening,boolean includeOpening)throws IOException {
+    public static void write(OutputStream output,List<Ledger.Entry> input,boolean template)throws IOException {writeInternal(output,input,template,Collections.emptyList(),false,null);}
+    public static void write(OutputStream output,List<Ledger.Entry> input,boolean template,List<OpeningAsset> opening)throws IOException {writeInternal(output,input,template,opening,true,null);}
+    static void writePlanning(OutputStream output,List<Ledger.Entry> input,List<OpeningAsset> opening,PlanningData planning)throws IOException {writeInternal(output,input,false,opening,true,planning);}
+    private static void writeInternal(OutputStream output,List<Ledger.Entry> input,boolean template,List<OpeningAsset> opening,boolean includeOpening,PlanningData planning)throws IOException {
         if(opening.size()>Ledger.MAX_IMPORT_ROWS)throw new IOException("기초자산은 최대10,000건까지 저장할 수 있어요.");
         List<Ledger.Entry> entries = new ArrayList<>(input);
         entries.sort(Comparator.comparing((Ledger.Entry e) -> e.date).thenComparing(e -> e.id));
         if(entries.size()>Ledger.MAX_IMPORT_ROWS) throw new IOException("한 파일에 최대 10,000건을 저장할 수 있어요. 기간을 나누어 백업해 주세요.");
         String[] names=template?new String[]{"내역","사용 안내","입력예시"}:new String[]{"요약","내역","사용 안내"};
         if(includeOpening){names=Arrays.copyOf(names,4);names[3]="기초자산";}
+        if(planning!=null){names=Arrays.copyOf(names,8);System.arraycopy(PLAN_NAMES,0,names,4,4);}
         try(ZipOutputStream zip=new ZipOutputStream(output,StandardCharsets.UTF_8)) {
             StringBuilder types=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>");
             StringBuilder book=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><workbook xmlns=\""+NS+"\" xmlns:r=\""+REL+"\">"+(template?"<bookViews><workbookView activeTab=\"2\"/></bookViews>":"")+"<sheets>");
@@ -54,7 +57,8 @@ public final class XlsxIO {
             put(zip,"xl/worksheets/sheet"+(template?1:2)+".xml",detailSheet(entries,template));
             if(template) put(zip,"xl/worksheets/sheet3.xml",exampleSheet());
             if(includeOpening)put(zip,"xl/worksheets/sheet4.xml",openingSheet(opening));
-            put(zip,"xl/worksheets/sheet"+(template?2:3)+".xml",guideSheet(template));
+            if(planning!=null)for(int i=0;i<4;i++)put(zip,"xl/worksheets/sheet"+(i+5)+".xml",planningSheet(planning,i));
+            put(zip,"xl/worksheets/sheet"+(template?2:3)+".xml",guideSheet(template,planning!=null));
         }
     }
     private static String detailSheet(List<Ledger.Entry> entries,boolean template) {
@@ -130,7 +134,7 @@ public final class XlsxIO {
         int row=1;for(OpeningAsset a:opening){row++;s.append("<row r=\"").append(row).append("\">").append(textCell("A"+row,a.date,0)).append(textCell("B"+row,a.memo,0)).append(textCell("C"+row,a.category,0)).append(numberCell("D"+row,Long.toString(a.amount),3)).append(textCell("E"+row,a.kind,0)).append(textCell("F"+row,a.id,0)).append("</row>");}
         return s.append("</sheetData><dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"0\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"자산 종류\" error=\"현금, 저축, 투자 중 선택하세요.\" sqref=\"E2:E10001\"><formula1>&quot;현금,저축,투자&quot;</formula1></dataValidation></dataValidations></worksheet>").toString();
     }
-    private static String guideSheet(boolean template) {
+    private static String guideSheet(boolean template,boolean planning) {
         String[] notes={"차곡가계부 엑셀 사용 안내", "내역 시트의 첫 번째 행은 바꾸지 말고, 두 번째 행부터 입력하세요.",
             "돈의 성격과 상세 분류는 별도 열이에요. 예: 수입 / 월급, 투자 / 주식.",
             "E열 돈의 성격 셀을 선택한 뒤 드롭다운에서 수입·지출·저축·투자·저축회수 중 하나를 고르세요.",
@@ -158,6 +162,7 @@ public final class XlsxIO {
             "해지 원금과 재가입은 내역에 실제 금액으로 적으세요. 저축회수는 원금, 이자와 정부기여금은 수입이에요. 기존 분류와 동일하게 적으세요.",
             "자산 화면은 가장 이른 기초자산 기준일 이후의 거래와 기초자산을 합산해요. 이전 거래를 중복해 기초자산으로 등록하지 마세요.",
             "앱 삭제 시 휴대폰 내 기록도 삭제돼요. 백업 파일은 휴대폰 밖에도 보관해 주세요."};
+        if(planning){String[] extra={"이 전체 백업에는 예산·목표, 반복 기록, 자주 쓰는 기록, 생활비 분류 시트가 포함돼요. 네 시트를 함께 보관하세요.","계획 시트는 가져오기 전에 오류를 확인하고 거래·기초자산과 함께 복원해요. 같은 예산·목표/고유ID는 현재 앱 값을 유지해요.","적용 월의 매월은 기본 금액, 빈 상세 분류는 전체예요. 반복 기준 일·월과 고유ID는 예정일과 중복 방지에 사용하므로 유지하세요.","생활비 전체 지출은 모든 지출, 선택 분류와 빈 상세 분류 한 행은 명시적으로0개예요. 계획 금액은 실제 거래 합계에 더하지 않아요.","PIN·화면·분류 숨김 설정은 포함하지 않아요. 저축 해지·배분 연결 정보까지 보관하려면 계획 포함 ZIP 백업을 사용하세요."};int n=notes.length;notes=Arrays.copyOf(notes,n+extra.length);System.arraycopy(extra,0,notes,n,extra.length);}
         StringBuilder sheet=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><cols><col min=\"1\" max=\"1\" width=\"120\" customWidth=\"1\"/></cols><sheetData>");
         for(int i=0;i<notes.length;i++) sheet.append("<row r=\"").append(i+1).append("\" ht=\"28\" customHeight=\"1\">").append(textCell("A"+(i+1),notes[i],i==0?1:0)).append("</row>");
         return sheet.append("</sheetData></worksheet>").toString();
@@ -220,10 +225,11 @@ public final class XlsxIO {
                 }
             }
         });
-        String[] selected={null,null}; boolean[] date1904={false};
+        String[] selected={null,null}; boolean[] date1904={false};Map<String,String> planPaths=new HashMap<>();
         parse(parts.get("xl/workbook.xml"),new DefaultHandler() {
             public void startElement(String uri,String local,String q,Attributes a) {
                 if(local.equals("workbookPr")) date1904[0]="1".equals(a.getValue("date1904")) || "true".equals(a.getValue("date1904"));
+                if(local.equals("sheet")&&Arrays.asList(PLAN_NAMES).contains(a.getValue("name"))){String id=a.getValue(REL,"id");if(id==null)id=a.getValue("r:id");String name=a.getValue("name");if(planPaths.containsKey(name))throw new IllegalArgumentException("중복된 계획 시트예요: "+name);String path=rels.get(id);if(path==null||!parts.containsKey(path))throw new IllegalArgumentException("계획 시트를 찾지 못했어요: "+name);planPaths.put(name,path);}
                 if(local.equals("sheet")&&"기초자산".equals(a.getValue("name"))){String id=a.getValue(REL,"id");if(id==null)id=a.getValue("r:id");selected[1]=rels.get(id);}
                 if(local.equals("sheet") && (selected[0]==null || "내역".equals(a.getValue("name")))) {
                     String id=a.getValue(REL,"id"); if(id==null) id=a.getValue("r:id");
@@ -235,6 +241,10 @@ public final class XlsxIO {
         ReadResult result = new ReadResult();
         parse(parts.get(selected[0]),new SheetHandler(strings,date1904[0],result));
         if(selected[1]!=null)parse(parts.get(selected[1]),new SheetHandler(strings,date1904[0],result,true));
+        if(!planPaths.isEmpty()){
+            if(planPaths.size()!=4)throw new IOException("계획 시트가 일부 없어요. 예산·목표, 반복 기록, 자주 쓰는 기록, 생활비 분류 시트를 함께 보관하세요.");
+            result.planning=new PlanningData();for(int i=0;i<4;i++)parse(parts.get(planPaths.get(PLAN_NAMES[i])),new PlanHandler(strings,date1904[0],result,i));
+        }
         return result;
     }
     private static void parse(byte[] xml,DefaultHandler handler) throws Exception {
@@ -252,7 +262,7 @@ public final class XlsxIO {
         reader.parse(new InputSource(new ByteArrayInputStream(xml)));
     }
     private static final class Cell { String value="",type=""; boolean formula; }
-    private static final class SheetHandler extends DefaultHandler {
+    private static class SheetHandler extends DefaultHandler {
         final List<String> strings; final boolean date1904,opening; final ReadResult result;
         final Map<Integer,Cell> cells=new HashMap<>(); final Map<String,Integer> headers=new HashMap<>();
         int row, column, rows; boolean inValue,inText,hasHeader,signedAmounts; Cell cell; StringBuilder value;
@@ -281,7 +291,7 @@ public final class XlsxIO {
             }
             if(local.equals("row")) finishRow();
         }
-        private void finishRow() throws SAXException {
+        void finishRow() throws SAXException {
             boolean blank=true; for(Cell c:cells.values()) if(!c.value.trim().isEmpty() || c.formula) blank=false;
             if(blank) return;
             if(!hasHeader) {
@@ -314,7 +324,7 @@ public final class XlsxIO {
                 if(result.errors.size()<50) result.errors.add((opening?"기초자산 시트 ":"")+row+"행: "+(e.getMessage()==null?"셀 값을 확인하세요.":e.getMessage()));
             }
         }
-        private String get(String name) {
+        String get(String name) {
             Integer c=headers.get(name); Cell found=c==null?null:cells.get(c);
             if(found==null) return "";
             if(found.formula) throw new IllegalArgumentException(name+"의 수식은 값으로 붙여 넣어 주세요.");
@@ -343,5 +353,47 @@ public final class XlsxIO {
             return null;
         }
     }
+
+    private static final String[] PLAN_NAMES={"예산·목표","반복 기록","자주 쓰는 기록","생활비 분류"};
+    private static final String[][] PLAN_HEADERS={
+        {"적용 월","돈의 성격","상세 분류","금액"},
+        {"이름","돈의 성격","상세 분류","금액","메모","반복 주기","다음 예정일","기준 일","기준 월","사용","고유ID"},
+        {"이름","돈의 성격","상세 분류","금액","메모","고유ID"},
+        {"반영 방식","상세 분류"}};
+    private static String planningSheet(PlanningData p,int kind){
+        List<String[]> rows=new ArrayList<>();
+        if(kind==0)for(PlanningData.Limit v:p.limits)rows.add(new String[]{v.month.equals("*")?"매월":v.month,v.type,v.category,Long.toString(v.amount)});
+        if(kind==1)for(PlanningData.Repeat v:p.repeats)rows.add(new String[]{v.name,v.type,v.category,Long.toString(v.amount),v.memo,v.cadence.equals("WEEKLY")?"매주":v.cadence.equals("YEARLY")?"매년":"매월",v.next.toString(),Integer.toString(v.anchorDay),Integer.toString(v.anchorMonth),v.enabled?"사용":"중지",v.id});
+        if(kind==2)for(PlanningData.Favorite v:p.favorites)rows.add(new String[]{v.name,v.type,v.category,Long.toString(v.amount),v.memo,v.id});
+        if(kind==3){if(!p.hasLivingFilter())rows.add(new String[]{"전체 지출",""});else if(p.livingCategories().isEmpty())rows.add(new String[]{"선택 분류",""});else for(String name:p.livingCategories())rows.add(new String[]{"선택 분류",name});}
+        StringBuilder s=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" state=\"frozen\"/></sheetView></sheetViews><cols>");
+        String[] heads=PLAN_HEADERS[kind];for(int i=0;i<heads.length;i++){int width=heads[i].equals("메모")?50:heads[i].equals("고유ID")?42:heads[i].equals("상세 분류")?26:20;s.append("<col min=\"").append(i+1).append("\" max=\"").append(i+1).append("\" width=\"").append(width).append("\" customWidth=\"1\"/>");}
+        s.append("</cols><sheetData><row r=\"1\" ht=\"28\" customHeight=\"1\">");for(int i=0;i<heads.length;i++)s.append(textCell(col(i)+"1",heads[i],1));s.append("</row>");int r=2;
+        for(String[] row:rows){s.append("<row r=\"").append(r).append("\">");for(int c=0;c<row.length;c++){String address=col(c)+r;if(heads[c].equals("금액")||heads[c].equals("기준 일")||heads[c].equals("기준 월"))s.append(numberCell(address,row[c],heads[c].equals("금액")?3:0));else s.append(textCell(address,row[c],0));}s.append("</row>");r++;}
+        s.append("</sheetData><autoFilter ref=\"A1:").append(col(heads.length-1)).append(Math.max(1,r-1)).append("\"/>");
+        if(kind<3){s.append("<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"0\" showErrorMessage=\"1\" errorStyle=\"stop\" sqref=\"B2:B1001\"><formula1>&quot;").append(kind==0?"지출,저축,투자":"수입,지출,저축,투자,저축회수").append("&quot;</formula1></dataValidation></dataValidations>");}
+        return s.append("</worksheet>").toString();
+    }
+    /** The ordinary cell reader is shared so inline/shared strings and Excel date systems agree. */
+    private static final class PlanHandler extends SheetHandler {
+        final int kind;final Set<String> keys=new HashSet<>();String mode;int livingRows;final Set<String> selected=new TreeSet<>();
+        PlanHandler(List<String> strings,boolean dates,ReadResult result,int kind){super(strings,dates,result);this.kind=kind;}
+        @Override void finishRow()throws SAXException{
+            boolean blank=true;for(Cell c:cells.values())if(!c.value.trim().isEmpty()||c.formula)blank=false;if(blank)return;
+            if(!hasHeader){for(Map.Entry<Integer,Cell> e:cells.entrySet()){Cell c=e.getValue();if(c.formula||"e".equals(c.type))throw new SAXException("계획 열 제목을 확인하세요.");String title=c.value.trim();if(Arrays.asList(PLAN_HEADERS[kind]).contains(title)&&headers.put(title,e.getKey())!=null)throw new SAXException("중복된 계획 열 제목: "+title);}for(String h:PLAN_HEADERS[kind])if(!headers.containsKey(h))throw new SAXException(PLAN_NAMES[kind]+" 시트에 "+h+" 열이 필요해요.");hasHeader=true;return;}
+            if(++rows>(kind==3?10000:PlanningData.MAX_ITEMS))throw new SAXException("계획 시트의 행이 너무 많아요.");
+            try{
+                PlanningData p=result.planning;
+                if(kind==0){String type=Ledger.normalizeType(get("돈의 성격"));if(!Arrays.asList("지출","저축","투자").contains(type))throw new IllegalArgumentException("예산·목표는 지출, 저축, 투자만 선택하세요.");String month=get("적용 월").trim();PlanningData.Limit v=new PlanningData.Limit(month.equals("매월")?"*":month,type,get("상세 분류"),Ledger.parseAmount(get("금액")));unique(v.key());p.put(v);}
+                else if(kind==1){String cadence=get("반복 주기").trim();cadence=cadence.equals("매월")?"MONTHLY":cadence.equals("매주")?"WEEKLY":cadence.equals("매년")?"YEARLY":cadence;String enabled=get("사용").trim();if(!enabled.equals("사용")&&!enabled.equals("중지"))throw new IllegalArgumentException("사용은 사용 또는 중지로 입력하세요.");String date=get("다음 예정일");if(date.matches("[+-]?\\d+(\\.\\d+)?")&&!date.matches("\\d{8}")){long serial=new BigDecimal(date).setScale(0,java.math.RoundingMode.FLOOR).longValueExact();if(serial<0||(!date1904&&serial==60))throw new IllegalArgumentException("예정일을 확인하세요.");date=(date1904?LocalDate.of(1904,1,1).plusDays(serial):LocalDate.of(1899,12,31).plusDays(serial>60?serial-1:serial)).toString();}PlanningData.Repeat v=new PlanningData.Repeat(get("고유ID"),get("이름"),get("돈의 성격"),Ledger.parseAmount(get("금액")),get("상세 분류"),get("메모"),cadence,LocalDate.parse(Ledger.normalizeDate(date)),integer("기준 일"),integer("기준 월"),enabled.equals("사용"));unique(v.id);p.put(v);}
+                else if(kind==2){PlanningData.Favorite v=new PlanningData.Favorite(get("고유ID"),get("이름"),get("돈의 성격"),Ledger.parseAmount(get("금액")),get("상세 분류"),get("메모"));unique(v.id);p.put(v);}
+                else {String next=get("반영 방식").trim();if(!next.equals("전체 지출")&&!next.equals("선택 분류"))throw new IllegalArgumentException("반영 방식은 전체 지출 또는 선택 분류예요.");if(mode!=null&&!mode.equals(next))throw new IllegalArgumentException("생활비 반영 방식이 섞여 있어요.");mode=next;String name=Ledger.cleanCategory(get("상세 분류"));if(mode.equals("전체 지출")&&(!name.isEmpty()||livingRows>0))throw new IllegalArgumentException("전체 지출은 상세 분류 없이 한 행만 입력하세요.");if(!name.isEmpty()){if(name.length()>40)throw new IllegalArgumentException("상세 분류는 40자까지 입력하세요.");selected.add(name);}livingRows++;}
+            }catch(Exception ex){result.invalidRows++;if(result.errors.size()<50)result.errors.add(PLAN_NAMES[kind]+" 시트 "+row+"행: "+ex.getMessage());}
+        }
+        void unique(String key){if(!keys.add(key))throw new IllegalArgumentException("같은 예산·목표 또는 고유ID가 중복돼요.");}
+        int integer(String name){return new BigDecimal(get(name).trim()).intValueExact();}
+        @Override public void endDocument()throws SAXException{if(!hasHeader)throw new SAXException(PLAN_NAMES[kind]+" 시트의 열 제목이 없어요.");if(kind==3){if(mode==null)throw new SAXException("생활비 반영 방식이 없어요.");if(mode.equals("선택 분류"))result.planning.selectLivingCategories(selected);}}
+    }
+
     private XlsxIO() {}
 }
