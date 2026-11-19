@@ -1,10 +1,10 @@
-﻿param(
+param(
     [Parameter(Mandatory=$true)][string]$Jdk,
     [Parameter(Mandatory=$true)][string]$AndroidJar,
     [Parameter(Mandatory=$true)][string]$BuildTools,
     [Parameter(Mandatory=$true)][string]$Adb,
     [Parameter(Mandatory=$true)][string]$Serial,
-    [ValidateSet('full','upgrade','preview','revision','history','overlay','workflow','iconbaseline','icon','settings','investment','comparison','consistency','planning','recovery','recoverybaseline','recoveryupgrade','opening','assetguard','assetbaseline','assetupgrade','guide','guidebaseline','guideupgrade','reset','resetverify','back','backbefore','startup','startupbefore','living','livingdark')][string]$Mode='full'
+    [ValidateSet('full','upgrade','preview','revision','history','overlay','workflow','iconbaseline','icon','settings','investment','comparison','consistency','planning','recovery','recoverybaseline','recoveryupgrade','opening','assetguard','assetbaseline','assetupgrade','guide','guidebaseline','guideupgrade','reset','resetverify','back','backbefore','startup','startupbefore','living','livingdark','calendar','calendarbefore')][string]$Mode='full'
 )
 $ErrorActionPreference='Stop'
 if($Serial -notmatch '^emulator-\d+$'){throw 'Use a disposable Android emulator. These tests reset this app database.'}
@@ -12,7 +12,7 @@ $taskOut=Join-Path $env:TEMP ('chagok-android-tests-'+[guid]::NewGuid().ToString
 New-Item -ItemType Directory -Path "$taskOut\tests\classes","$taskOut\tests\dex" -Force | Out-Null
 function Run-Checked([string]$Tool,[string[]]$Arguments){ & $Tool @Arguments; if($LASTEXITCODE -ne 0){throw "$Tool failed ($LASTEXITCODE)"} }
 & "$PSScriptRoot\build-local.ps1" -Jdk $Jdk -AndroidJar $AndroidJar -BuildTools $BuildTools -Output "$taskOut\app" -Keystore "$PSScriptRoot\local-test.keystore"
-Run-Checked "$Jdk\bin\javac.exe" @('-encoding','UTF-8','-source','8','-target','8','-cp',"$AndroidJar;$taskOut\app\classes.jar",'-d',"$taskOut\tests\classes","$PSScriptRoot\tests\android\DeviceChecks.java","$PSScriptRoot\tests\android\AssetGuardChecks.java","$PSScriptRoot\tests\android\UserGuideChecks.java","$PSScriptRoot\tests\android\ResetChecks.java","$PSScriptRoot\tests\android\BackNavigationChecks.java","$PSScriptRoot\tests\android\StartupChecks.java","$PSScriptRoot\tests\android\LivingBudgetChecks.java")
+Run-Checked "$Jdk\bin\javac.exe" @('-encoding','UTF-8','-source','8','-target','8','-cp',"$AndroidJar;$taskOut\app\classes.jar",'-d',"$taskOut\tests\classes","$PSScriptRoot\tests\android\DeviceChecks.java","$PSScriptRoot\tests\android\AssetGuardChecks.java","$PSScriptRoot\tests\android\UserGuideChecks.java","$PSScriptRoot\tests\android\ResetChecks.java","$PSScriptRoot\tests\android\BackNavigationChecks.java","$PSScriptRoot\tests\android\StartupChecks.java","$PSScriptRoot\tests\android\LivingBudgetChecks.java","$PSScriptRoot\tests\android\CalendarStartupChecks.java")
 Run-Checked "$Jdk\bin\jar.exe" @('--create','--file',"$taskOut\tests\classes.jar",'-C',"$taskOut\tests\classes",'.')
 Run-Checked "$Jdk\bin\java.exe" @('-cp',"$BuildTools\lib\d8.jar",'com.android.tools.r8.D8','--lib',$AndroidJar,'--min-api','26','--output',"$taskOut\tests\dex","$taskOut\tests\classes.jar")
 Run-Checked "$BuildTools\aapt2.exe" @('link','-o',"$taskOut\tests\unsigned.apk",'--manifest',"$PSScriptRoot\tests\android\AndroidManifest.xml",'-I',$AndroidJar,'-A',"$PSScriptRoot\tests\android\assets")

@@ -24,7 +24,7 @@ final class StartupChecks {
   t.navigate(app,6);close(t,app);app=start(t,false);t.eq(5,UserGuideChecks.get(app,"tab"));
   prefs.startTab(0);close(t,app);app=start(t,false);t.eq(0,UserGuideChecks.get(app,"tab"));ctx.getSharedPreferences("app_preferences",0).edit().remove("start_tab").commit();
   prefs.startTab(6);t.eq(5,prefs.startTab());ctx.getSharedPreferences("app_preferences",0).edit().remove("start_tab").commit();
-  t.navigate(app,3);reopen(t);t.eq(3,UserGuideChecks.get(app,"tab"));
+  t.navigate(app,3);reopen(t);t.eq(5,UserGuideChecks.get(app,"tab"));t.navigate(app,3);
   final MainActivity pickerApp=app;t.runOnMainSync(()->{try{DeviceChecks.invoke(pickerApp,"chooseImport");}catch(Exception ex){throw new RuntimeException(ex);}});Thread.sleep(600);BackNavigationChecks.back(t);t.eq(3,UserGuideChecks.get(app,"tab"));
   close(t,app);app=start(t,true);t.eq(3,UserGuideChecks.get(app,"tab"));
   prefs.setPinHash(PinCrypto.create("1234"));t.navigate(app,6);shell(t,"input keyevent 3");Thread.sleep(1500);shell(t,"am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -f 0x10200000 -n kr.chagok.ledger/.MainActivity");t.eq(5,UserGuideChecks.get(app,"tab"));t.eq(true,t.activeText("차곡가계부 잠금"));
