@@ -23,9 +23,16 @@ public final class OpeningAsset {
   try{List<OpeningAsset> all=new ArrayList<>(existing);all.addAll(plan.openingAdditions);sameDate(all);}catch(IllegalArgumentException ex){plan.errors.add(ex.getMessage());}
  }
  static Map<String,Long> balances(List<OpeningAsset> opening,List<Ledger.Entry> entries,String asOf){
+  return balances(opening,entries,asOf,Collections.emptyList());
+ }
+ static Map<String,Ledger.Entry> entryMap(List<Ledger.Entry> entries){Map<String,Ledger.Entry> out=new HashMap<>();for(Ledger.Entry e:entries)out.put(e.id,e);return out;}
+ static boolean hasMovementEntries(SavingsMovement m,Map<String,Ledger.Entry> byId){for(Ledger.Entry e:m.entries())if(!byId.containsKey(e.id)||!byId.get(e.id).sameContent(e))return false;return true;}
+ static Map<String,Long> balances(List<OpeningAsset> opening,List<Ledger.Entry> entries,String asOf,List<SavingsMovement> movements){
   String to=Ledger.normalizeDate(asOf),from="0000-01-01";for(OpeningAsset a:opening)if(a.date.compareTo(to)<=0&&(from.equals("0000-01-01")||a.date.compareTo(from)<0))from=a.date;
   Map<String,Long> out=new TreeMap<>();long cash=0;for(OpeningAsset a:opening)if(a.date.compareTo(to)<=0){if(a.kind.equals("현금"))cash=Math.addExact(cash,a.amount);else add(out,a.kind+" · "+a.category,a.amount);}
   for(Ledger.Entry e:entries)if(e.date.compareTo(from)>=0&&e.date.compareTo(to)<=0){long delta=e.type.equals("수입")||e.type.equals("저축회수")?e.amount:-e.amount;cash=Math.addExact(cash,delta);if(e.type.equals("저축")||e.type.equals("저축회수"))add(out,"저축 · "+e.category,e.effect());else if(e.type.equals("투자"))add(out,"투자 · "+e.category,e.amount);}
+  Map<String,Ledger.Entry> byId=entryMap(entries);
+  for(SavingsMovement m:movements)if(!m.detailed&&m.date.compareTo(from)>=0&&m.date.compareTo(to)<=0&&hasMovementEntries(m,byId)){long amount=Math.min(m.principal,m.saving);add(out,"저축 · "+m.source,-amount);add(out,"저축 · "+m.savingCategory,amount);}
   out.put("현금 · 거래 후 잔액",cash);return out;
  }
  private static void add(Map<String,Long> map,String key,long amount){map.put(key,Math.addExact(map.getOrDefault(key,0L),amount));}
