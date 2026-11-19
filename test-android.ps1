@@ -1,10 +1,10 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][string]$Jdk,
     [Parameter(Mandatory=$true)][string]$AndroidJar,
     [Parameter(Mandatory=$true)][string]$BuildTools,
     [Parameter(Mandatory=$true)][string]$Adb,
     [Parameter(Mandatory=$true)][string]$Serial,
-    [ValidateSet('full','upgrade','preview','revision','history','overlay','workflow','iconbaseline','icon','settings','investment','comparison','consistency','planning','recovery','recoverybaseline','recoveryupgrade','opening','assetguard','assetbaseline','assetupgrade')][string]$Mode='full'
+    [ValidateSet('full','upgrade','preview','revision','history','overlay','workflow','iconbaseline','icon','settings','investment','comparison','consistency','planning','recovery','recoverybaseline','recoveryupgrade','opening','assetguard','assetbaseline','assetupgrade','guide','guidebaseline','guideupgrade','reset','resetverify')][string]$Mode='full'
 )
 $ErrorActionPreference='Stop'
 if($Serial -notmatch '^emulator-\d+$'){throw 'Use a disposable Android emulator. These tests reset this app database.'}
@@ -12,7 +12,7 @@ $taskOut=Join-Path $env:TEMP ('chagok-android-tests-'+[guid]::NewGuid().ToString
 New-Item -ItemType Directory -Path "$taskOut\tests\classes","$taskOut\tests\dex" -Force | Out-Null
 function Run-Checked([string]$Tool,[string[]]$Arguments){ & $Tool @Arguments; if($LASTEXITCODE -ne 0){throw "$Tool failed ($LASTEXITCODE)"} }
 & "$PSScriptRoot\build-local.ps1" -Jdk $Jdk -AndroidJar $AndroidJar -BuildTools $BuildTools -Output "$taskOut\app" -Keystore "$PSScriptRoot\local-test.keystore"
-Run-Checked "$Jdk\bin\javac.exe" @('-encoding','UTF-8','-source','8','-target','8','-cp',"$AndroidJar;$taskOut\app\classes.jar",'-d',"$taskOut\tests\classes","$PSScriptRoot\tests\android\DeviceChecks.java","$PSScriptRoot\tests\android\AssetGuardChecks.java")
+Run-Checked "$Jdk\bin\javac.exe" @('-encoding','UTF-8','-source','8','-target','8','-cp',"$AndroidJar;$taskOut\app\classes.jar",'-d',"$taskOut\tests\classes","$PSScriptRoot\tests\android\DeviceChecks.java","$PSScriptRoot\tests\android\AssetGuardChecks.java","$PSScriptRoot\tests\android\UserGuideChecks.java","$PSScriptRoot\tests\android\ResetChecks.java")
 Run-Checked "$Jdk\bin\jar.exe" @('--create','--file',"$taskOut\tests\classes.jar",'-C',"$taskOut\tests\classes",'.')
 Run-Checked "$Jdk\bin\java.exe" @('-cp',"$BuildTools\lib\d8.jar",'com.android.tools.r8.D8','--lib',$AndroidJar,'--min-api','26','--output',"$taskOut\tests\dex","$taskOut\tests\classes.jar")
 Run-Checked "$BuildTools\aapt2.exe" @('link','-o',"$taskOut\tests\unsigned.apk",'--manifest',"$PSScriptRoot\tests\android\AndroidManifest.xml",'-I',$AndroidJar,'-A',"$PSScriptRoot\tests\android\assets")
@@ -27,4 +27,16 @@ if($Mode -ne 'full'){$taskInstrumentArgs+=@('-e','mode',$Mode)}
 $taskInstrumentArgs+='kr.chagok.ledger.tests/kr.chagok.ledger.DeviceChecks'
 $taskResult=& $Adb @taskInstrumentArgs
 $taskResult
-if(($taskResult -join "`n") -notmatch 'PASS: \d+ Android integration checks'){throw 'Android integration tests failed'}
+if($Mode -eq 'reset'){
+    $taskResetOutput=$taskResult -join "`n"
+    if($taskResetOutput -notmatch 'RESET_READY: (\d+) checks; BACKUP_PATH: ([^;]+); BACKUP_SHA256: ([a-f0-9]+)'){throw 'Reset did not reach its confirmed delete step'}
+    $taskResetCount=$Matches[1];$taskBackupPath=$Matches[2];$taskBackupHash=$Matches[3]
+    $taskVerify=& $Adb -s $Serial shell am instrument -w -e mode resetverify kr.chagok.ledger.tests/kr.chagok.ledger.DeviceChecks
+    $taskVerify
+    if(($taskVerify -join "`n") -notmatch 'PASS: \d+ Android integration checks'){throw 'Post-reset verification failed'}
+    Run-Checked $Adb @('-s',$Serial,'pull',('/sdcard/'+$taskBackupPath),"$taskOut\preserved-backup.xlsx")
+    if((Get-FileHash -LiteralPath "$taskOut\preserved-backup.xlsx" -Algorithm SHA256).Hash.ToLowerInvariant() -ne $taskBackupHash){throw 'Public backup changed or disappeared after reset'}
+    Run-Checked $Adb @('-s',$Serial,'pull','/sdcard/Download/ChagokTest',"$taskOut\public-evidence")
+    Write-Output "PASS: $taskResetCount pre-reset checks; OS process termination expected; post-reset checks passed; exported backup SHA256 unchanged"
+    Write-Output "Reset evidence: $taskOut"
+}elseif(($taskResult -join "`n") -notmatch 'PASS: \d+ Android integration checks'){throw 'Android integration tests failed'}
