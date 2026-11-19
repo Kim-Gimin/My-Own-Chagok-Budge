@@ -1,11 +1,11 @@
 {
-  "version": "0.6.2",
-  "code": 11,
-  "variant": "-lifestyle",
-  "tag": "v0.6.2-lifestyle",
-  "source": "chagok-source-0.6.2-생활관리.zip",
-  "source_sha256": "03ac11e54a76043eb33c68fa65970f67bdc930c4700b75dde5d5c318bdc94afa",
-  "files": 65,
+  "version": "0.7.1",
+  "code": 13,
+  "variant": "",
+  "tag": "v0.7.1",
+  "source": "chagok-source-0.7.1.zip",
+  "source_sha256": "5411f1d4dfde4d878d21c2ec5d189093487271a136121705f6849da1180828d3",
+  "files": 66,
   "excluded": [
     "local-test.keystore"
   ],

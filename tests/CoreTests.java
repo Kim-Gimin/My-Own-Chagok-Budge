@@ -93,10 +93,11 @@ public final class CoreTests {
         eq(500000L,StatisticsData.aggregate(entries,"지출").total);eq(700000L,StatisticsData.aggregate(entries,"저축").total);eq(400000L,StatisticsData.aggregate(entries,"투자").total);eq("ETF",StatisticsData.aggregate(entries,"투자").categories.get(0).name);
         byte[] bytes=export(entries,false);Map<String,String> parts=unzip(bytes);String book=parts.get("xl/workbook.xml"),detail=parts.get("xl/worksheets/sheet2.xml"),summary=parts.get("xl/worksheets/sheet1.xml");
         eq(true,book.indexOf("name=\"요약\"")<book.indexOf("name=\"내역\""));eq(true,book.indexOf("name=\"내역\"")<book.indexOf("name=\"사용 안내\""));
-        String[] labels={"날짜","내역","상세 분류","돈의 성격","금액","계좌","고유ID"};for(int i=0;i<labels.length;i++)eq(true,detail.contains(s((char)('A'+i)+"1",labels[i]).replace(" t=\"inlineStr\""," t=\"inlineStr\" s=\"1\"").replace("<t>","<t xml:space=\"preserve\">")));
-        eq("3000000",cached(detail,"E2"));eq("-500000",cached(detail,"E3"));eq("-700000",cached(detail,"E4"));eq("-400000",cached(detail,"E5"));eq(true,detail.contains("A1:G5"));
-        eq(true,detail.contains("sqref=\"D2:D10001\""));eq(true,detail.contains("errorStyle=\"stop\""));eq(true,detail.contains("showDropDown=\"0\""));eq(true,detail.contains("수입,지출,저축,투자"));
-        eq(true,detail.contains("r=\"F2\" t=\"inlineStr\" s=\"0\"><is><t xml:space=\"preserve\"></t>"));eq(true,parts.get("xl/styles.xml").contains("+#,##0;-#,##0;0"));
+        String[] labels={"날짜","내역","상세 분류","금액","돈의 성격","고유ID"};for(int i=0;i<labels.length;i++)eq(true,detail.contains(s((char)('A'+i)+"1",labels[i]).replace(" t=\"inlineStr\""," t=\"inlineStr\" s=\"1\"").replace("<t>","<t xml:space=\"preserve\">")));
+        eq("3000000",cached(detail,"D2"));eq("-500000",cached(detail,"D3"));eq("-700000",cached(detail,"D4"));eq("-400000",cached(detail,"D5"));eq(true,detail.contains("A1:F5"));eq(false,detail.contains("계좌"));
+        eq(true,detail.contains("sqref=\"E2:E10001\""));eq(true,detail.contains("errorStyle=\"stop\""));eq(true,detail.contains("showDropDown=\"0\""));eq(true,detail.contains("수입,지출,저축,투자"));
+        eq(true,detail.contains("r=\"F2\" t=\"inlineStr\" s=\"0\"><is><t xml:space=\"preserve\">income</t>"));eq(true,parts.get("xl/styles.xml").contains("+#,##0;-#,##0;0"));
+        eq(true,summary.contains("SUMIFS('내역'!$D$2:$D$5,'내역'!$E$2:$E$5"));
         eq("3000000",cached(summary,"B3"));eq("500000",cached(summary,"B4"));eq("700000",cached(summary,"B5"));eq("400000",cached(summary,"B6"));eq("1400000",cached(summary,"B7"));eq(true,summary.contains("B3-B4-B5-B6"));eq(true,summary.contains("IF(B3&gt;0,B5/B3,0)"));eq(true,summary.contains("2026-10-01 ~ 2026-10-04"));
         eq(true,Math.abs(700000.0/3000000-Double.parseDouble(cached(summary,"B8")))<1e-15);
         XlsxIO.ReadResult read=read(bytes);eq(0,read.invalidRows);eq(4,read.entries.size());for(int i=0;i<4;i++){eq(entries.get(i).id,read.entries.get(i).id);eq(entries.get(i).fingerprint(),read.entries.get(i).fingerprint());}
@@ -105,17 +106,28 @@ public final class CoreTests {
         eq(1,Ledger.planImport(Collections.singletonList(new Ledger.Entry("investment","2026-10-04","저축",400000,"ETF","정기 매수",0)),entries).errors.size());
         parts=unzip(export(Collections.emptyList(),false));summary=parts.get("xl/worksheets/sheet1.xml");eq(true,summary.contains("기록 없음"));for(int r=3;r<=8;r++)eq("0",cached(summary,"B"+r));eq(0,read(export(Collections.emptyList(),false)).entries.size());
         parts=unzip(export(Collections.emptyList(),true));eq(false,parts.get("xl/workbook.xml").contains("name=\"요약\""));eq(true,parts.get("xl/worksheets/sheet1.xml").contains("수입,지출,저축,투자"));eq(true,parts.get("xl/worksheets/sheet1.xml").contains("돈의 성격"));
-        eq(true,parts.get("xl/worksheets/sheet1.xml").contains("sqref=\"D2:D10001\""));
-        eq(true,parts.get("xl/worksheets/sheet1.xml").contains("A1:G1"));
+        eq(true,parts.get("xl/worksheets/sheet1.xml").contains("sqref=\"E2:E10001\""));
+        eq(true,parts.get("xl/worksheets/sheet1.xml").contains("A1:F1"));
+        eq(true,parts.get("xl/workbook.xml").contains("name=\"입력예시\""));
+        eq(true,parts.get("xl/workbook.xml").contains("activeTab=\"2\""));
+        eq(true,parts.get("xl/worksheets/sheet1.xml").contains("showInputMessage=\"1\""));
+        String examples=parts.get("xl/worksheets/sheet3.xml");
+        for(String meaning:new String[]{"받은 돈","생활에 쓴 돈","따로 모은 돈","매수·납입에 쓴 돈"})eq(true,examples.contains(meaning));
+        for(int i=0;i<8;i++)eq(Long.toString(new long[]{3000000,5000,12500,1500,700000,100000,400000,100000}[i]),cached(examples,"D"+(i+12)));
+        eq(0,read(export(Collections.emptyList(),true)).entries.size());
+        eq(4,read(export(entries,true)).entries.size());
         Map<String,String> filledTemplate=unzip(export(entries,true));
-        for(int i=0;i<4;i++)eq(Long.toString(TransactionType.signedAmount(entries.get(i))),cached(filledTemplate.get("xl/worksheets/sheet1.xml"),"E"+(i+2)));
+        for(int i=0;i<4;i++)eq(Long.toString(entries.get(i).amount),cached(filledTemplate.get("xl/worksheets/sheet1.xml"),"D"+(i+2)));
         eq(4,read(export(entries,true)).entries.size());eq(0,read(export(entries,true)).invalidRows);
         for(int i=0;i<4;i++)eq(entries.get(i).fingerprint(),read(export(entries,true)).entries.get(i).fingerprint());
         read=read(fixture(signedHeaders()+signedRow("투자","-1,234"),false,null));eq(0,read.invalidRows);eq("투자",read.entries.get(0).type);eq(1234L,read.entries.get(0).amount);eq("상세",read.entries.get(0).category);eq("월급과 주식",read.entries.get(0).memo);
         read=read(fixture(signedHeaders().replace("돈의 성격","거래유형").replace("상세 분류","카테고리")+signedRow("투자","-4000"),false,null));eq(0,read.invalidRows);eq(4000L,read.entries.get(0).amount);
         for(String type:Ledger.TYPES) {
-            for(String amount:(type.equals("수입")?new String[]{"1","+1000","999999999999"}:new String[]{"-1","-1E3","-999999999999"}))eq(0,read(fixture(signedHeaders()+signedRow(type,amount),false,null)).invalidRows);
-            for(String amount:(type.equals("수입")?new String[]{"-1","0","1.5","1000000000000",""}:new String[]{"1","0","-1.5","-1000000000000",""}))eq(1,read(fixture(signedHeaders()+signedRow(type,amount),false,null)).invalidRows);
+            for(String amount:(type.equals("수입")?new String[]{"1","+1000","999999999999"}:new String[]{"1","+1000","999999999999","-1","-1E3","-999999999999"}))eq(0,read(fixture(signedHeaders()+signedRow(type,amount),false,null)).invalidRows);
+            for(String amount:(type.equals("수입")?new String[]{"-1","0","1.5","1000000000000",""}:new String[]{"0","1.5","-1.5","1000000000000","-1000000000000",""}))eq(1,read(fixture(signedHeaders()+signedRow(type,amount),false,null)).invalidRows);
+            XlsxIO.ReadResult positive=read(fixture(signedHeaders()+signedRow(type,"1,234"),false,null));
+            eq(0,positive.invalidRows);eq(type,positive.entries.get(0).type);eq(1234L,positive.entries.get(0).amount);eq(type.equals("수입")?1234L:-1234L,Ledger.available(Ledger.totals(positive.entries)));
+            if(!type.equals("수입")){XlsxIO.ReadResult negative=read(fixture(signedHeaders()+signedRow(type,"-1,234"),false,null));eq(positive.entries.get(0).fingerprint(),negative.entries.get(0).fingerprint());eq(1,Ledger.planImport(positive.entries,negative.entries).duplicates);}
         }
         eq(1,read(fixture(signedHeaders()+signedRow("이체","-100"),false,null)).invalidRows);eq(1,read(fixture(signedHeaders()+signedRow("없는 유형","-100"),false,null)).invalidRows);
         for(String amount:new String[]{"-1E999999999","-1E-999999999"})eq(1,read(fixture(signedHeaders()+signedRow("투자",amount),false,null)).invalidRows);
@@ -221,11 +233,11 @@ public final class CoreTests {
         if(args.length>0){try(InputStream input=Files.newInputStream(Paths.get(args[0]))){result=XlsxIO.read(input);eq(0,result.invalidRows);eq(true,result.entries.size()==3||result.entries.size()==4);eq(3000000L,Ledger.totals(result.entries)[0]);eq(1000000L,Ledger.totals(result.entries)[2]);eq(result.entries.size()==4?400000L:0L,Ledger.totals(result.entries)[3]);}}
         if(args.length>1) {
             try(InputStream input=Files.newInputStream(Paths.get(args[1]))) {
-                result=XlsxIO.read(input);eq(0,result.invalidRows);eq(4,result.entries.size());
-                long[] templateTotals=Ledger.totals(result.entries);eq(3000000L,templateTotals[0]);eq(12500L,templateTotals[1]);eq(1000000L,templateTotals[2]);eq(400000L,templateTotals[3]);eq(1587500L,Ledger.available(templateTotals));
-                eq("월급",result.entries.get(0).category);eq("식비",result.entries.get(1).category);eq("적금",result.entries.get(2).category);eq("ETF",result.entries.get(3).category);
-                for(Ledger.Entry e:result.entries)eq("",e.id);
-                eq(4,Ledger.planImport(result.entries,result.entries).duplicates);
+                result=XlsxIO.read(input);eq(0,result.invalidRows);eq(0,result.entries.size());
+                Map<String,String> supplied=unzip(Files.readAllBytes(Paths.get(args[1])));
+                eq(true,supplied.get("xl/workbook.xml").contains("입력예시"));
+                eq(true,supplied.get("xl/worksheets/sheet1.xml").contains("showInputMessage=\"1\""));
+                eq(true,supplied.get("xl/worksheets/sheet3.xml").contains("입력 예시 8건"));
             }
         }
         StatisticsData.Summary stats=StatisticsData.aggregate(data,"지출");eq(500000L,stats.total);eq(1,stats.categories.size());eq(100.0,stats.percent(500000));
