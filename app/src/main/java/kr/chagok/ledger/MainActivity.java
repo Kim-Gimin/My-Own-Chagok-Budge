@@ -211,7 +211,7 @@ public final class MainActivity extends Activity {
     private LinearLayout.LayoutParams headerIconParams(){return new LinearLayout.LayoutParams(dp(HEADER_TOUCH),dp(HEADER_TOUCH));}
     private android.graphics.drawable.Drawable headerRipple(){GradientDrawable mask=new GradientDrawable();mask.setShape(GradientDrawable.OVAL);mask.setColor(Color.WHITE);return new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(preferences.dark()?0x33FFFFFF:0x1F000000),null,mask);}
     private void navigate(int target){hideKeyboard();if(target==6)settingsReturnTab=tab;if(target==1)recordsAll=true;tab=target;displayLimit=100;render();}
-    private void showMenu(){String[] names={"저축 해지·배분","결산","원형·막대 통계","월별 추이·전월 비교","예산·목표·반복·자주 쓰는 기록","홈","달력","내역","엑셀 백업·가져오기","설정"};int[] targets={-1,4,2,8,7,5,0,1,3,6};new AlertDialog.Builder(this).setTitle("메뉴").setItems(names,(d,i)->{if(targets[i]<0)movementList();else navigate(targets[i]);}).setNegativeButton("닫기",null).show();}
+    private void showMenu(){String[] names={"저축 해지·배분","기초자산·현재 보유","결산","원형·막대 통계","월별 추이·전월 비교","예산·목표·반복·자주 쓰는 기록","홈","달력","내역","엑셀 백업·가져오기","설정"};int[] targets={-1,-2,4,2,8,7,5,0,1,3,6};new AlertDialog.Builder(this).setTitle("메뉴").setItems(names,(d,i)->{if(targets[i]==-2)openingList();else if(targets[i]<0)movementList();else navigate(targets[i]);}).setNegativeButton("닫기",null).show();}
     private void settlements(){
         LinearLayout controls=column();controls.setPadding(dp(18),0,dp(18),dp(12));LinearLayout tabs=row();
         String[] names={"연간 결산","종합 결산","기간 결산"};
@@ -238,6 +238,7 @@ public final class MainActivity extends Activity {
         planningShortcut();page.setGravity(Gravity.CENTER);Set<String> chosen=preferences.homeMetrics();for(OverviewData.Metric metric:OverviewData.metrics(all,LocalDate.now()))if(chosen.contains(metric.id))valueRow(page,metric.label+" :",metric.amount,INK,16,true,0);if(chosen.isEmpty()){page.addView(label("홈에 표시할 결산을 선택하세요.",15,MUTED));space(page,16);page.addView(button("홈 화면 커스텀",GREEN,false,this::customizeHome));}space(page,70);}
     private void settingItem(String title,String desc,Runnable action){LinearLayout c=card(page);LinearLayout r=row();r.addView(text(title,16,INK,true),new LinearLayout.LayoutParams(0,-2,1));r.addView(text("›",25,MUTED,false));c.addView(r);if(!desc.isEmpty()){space(c,11);TextView sub=label(desc,13,MUTED);sub.setLineSpacing(dp(3),1);c.addView(sub);}c.setContentDescription(title);c.setOnClickListener(v->action.run());}
     private void settings(){
+        settingItem("기초자산·현재 보유","기록 시작 전 보유한 현금·저축·투자와 현재 금액을 따로 관리해요.",this::openingList);
         settingItem("저축 해지·배분","원금과 수령액을 입력하고 예금·투자로 나눠요.",this::movementList);
         settingItem("예산·목표·반복 관리","예산, 납입 목표와 자주 쓰는 기록을 관리해요.",()->navigate(7));
         settingItem("월별 추이·전월 비교","최근 6개월 또는 12개월의 네 유형을 비교해요.",()->navigate(8));
@@ -686,15 +687,16 @@ public final class MainActivity extends Activity {
         Uri uri=data.getData();
         if(request==ARCHIVE_IMPORT){loadArchive(uri);return;}
         if(request==ARCHIVE_EXPORT){
-            setBusy("계획과 내역을 백업하고 있어요");io.execute(()->{try{BackupArchive.Snapshot snapshot=db.snapshot();try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("파일을 열 수 없어요.");BackupArchive.write(out,snapshot.entries,snapshot.planning,snapshot.movements);}runOnUiThread(()->{backupStatus.success("계획 포함 백업",snapshot.entries.size());clearBusy();render();toast("계획과 내역을 백업했어요.");});}catch(Exception ex){runOnUiThread(()->{clearBusy();error("백업하지 못했어요",message(ex));});}});return;
+            setBusy("계획과 내역을 백업하고 있어요");io.execute(()->{try{BackupArchive.Snapshot snapshot=db.snapshot();try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("파일을 열 수 없어요.");BackupArchive.write(out,snapshot.entries,snapshot.planning,snapshot.movements,snapshot.openingAssets);}runOnUiThread(()->{backupStatus.success("계획 포함 백업",snapshot.entries.size());clearBusy();render();toast("계획과 내역을 백업했어요.");});}catch(Exception ex){runOnUiThread(()->{clearBusy();error("백업하지 못했어요",message(ex));});}});return;
         }
         if(request==IMPORT) loadImport(uri);
         else if(request==EXPORT || request==TEMPLATE || request==EXPORT_MONTH) {
-            List<Ledger.Entry> exportData=request==TEMPLATE?new ArrayList<>():request==EXPORT_MONTH?Ledger.month(db.all(),pendingExportMonth==null?month:pendingExportMonth):db.all();
+            BackupArchive.Snapshot exportSnapshot=db.snapshot();
+            List<Ledger.Entry> exportData=request==TEMPLATE?new ArrayList<>():request==EXPORT_MONTH?Ledger.month(exportSnapshot.entries,pendingExportMonth==null?month:pendingExportMonth):exportSnapshot.entries;
             setBusy("엑셀 파일을 저장하고 있어요");
             io.execute(()->{
                 try {
-                    try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){if(output==null)throw new IOException("파일을 열 수 없어요.");XlsxIO.write(output,exportData,request==TEMPLATE);}
+                    try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){if(output==null)throw new IOException("파일을 열 수 없어요.");XlsxIO.write(output,exportData,request==TEMPLATE,request==TEMPLATE?Collections.emptyList():exportSnapshot.openingAssets);}
                     runOnUiThread(()->{if(request==EXPORT)backupStatus.success("엑셀 전체 내역",exportData.size());clearBusy();if(tab==3)render();toast(request==TEMPLATE?"입력 양식을 저장했어요.":exportData.size()+"건을 백업했어요.");});
                 } catch(Exception ex) {runOnUiThread(()->{clearBusy();error("저장하지 못했어요",message(ex)+"\n만들어진 빈 파일이 있다면 삭제한 뒤 다시 시도해 주세요.");});}
             });
@@ -705,7 +707,7 @@ public final class MainActivity extends Activity {
         io.execute(()->{
             try(InputStream input=getContentResolver().openInputStream(uri)) {
                 if(input==null) throw new IOException("파일을 열 수 없어요.");
-                XlsxIO.ReadResult read=XlsxIO.read(input); Ledger.ImportPlan plan=Ledger.planImport(read.entries,db.all());
+                XlsxIO.ReadResult read=XlsxIO.read(input); Ledger.ImportPlan plan=db.planImport(read.entries,read.openingAssets);
                 runOnUiThread(()->{clearBusy();preview(read,plan);});
             } catch(Exception ex) {runOnUiThread(()->{clearBusy();error("가져오지 못했어요",message(ex));});}
         });
@@ -717,20 +719,22 @@ public final class MainActivity extends Activity {
             List<String> errors=new ArrayList<>(read.errors); errors.addAll(plan.errors);
             error("파일을 수정해 주세요","오류 "+(read.invalidRows+plan.errors.size())+"건을 찾았어요. 아직 아무 내역도 추가하지 않았어요.\n\n"+joinErrors(errors)+"\n\n엑셀에서 수정한 뒤 다시 가져와 주세요."); return;
         }
-        if(plan.additions.isEmpty()) {error("추가할 내역이 없어요",plan.duplicates>0?"이미 저장된 "+plan.duplicates+"건은 중복으로 건너뛰었어요.":"내역 시트의 두 번째 행부터 기록을 입력해 주세요.");return;}
+        if(plan.additions.isEmpty()&&plan.openingAdditions.isEmpty()) {error("추가할 내역이 없어요",plan.duplicates>0?"이미 저장된 "+plan.duplicates+"건은 중복으로 건너뛰었어요.":"내역 시트의 두 번째 행부터 기록을 입력해 주세요.");return;}
         long[] t=Ledger.totals(plan.additions);
         StringBuilder summary=new StringBuilder("새 내역 "+plan.additions.size()+"건\n중복 제외 "+plan.duplicates+"건\n\n");
         for(int i=0;i<Ledger.TYPES.length;i++) summary.append(Ledger.TYPES[i]).append("  ").append(won(t[i])).append('\n');
+        if(!read.openingAssets.isEmpty())summary.append("기초자산 추가 ").append(plan.openingAdditions.size()).append("건 · 중복 ").append(plan.openingDuplicates).append("건\n수입·저축 합계에는 더하지 않아요.\n");
         summary.append("\n미리보기\n");
         for(int i=0;i<Math.min(5,plan.additions.size());i++){Ledger.Entry e=plan.additions.get(i);summary.append(e.date).append("  ").append(e.type).append("  ").append(won(e.amount)).append("\n").append(e.category).append(e.memo.isEmpty()?"":" · "+e.memo).append("\n\n");}
+        for(int i=0;i<Math.min(5,plan.openingAdditions.size());i++){OpeningAsset a=plan.openingAdditions.get(i);summary.append("기초자산 ").append(a.date).append(" · ").append(a.kind).append(" · ").append(a.category).append(" · ").append(won(a.amount)).append("\n");}
         if(plan.additions.size()>5) summary.append("외 ").append(plan.additions.size()-5).append("건\n\n");
         summary.append("기존 내역에 추가하며, 기존 내역은 지우지 않아요.");
-        new AlertDialog.Builder(this).setTitle("이 내역을 가져올까요?").setMessage(summary.toString()).setNegativeButton("취소",null).setPositiveButton(plan.additions.size()+"건 추가",(d,w)->{
+        new AlertDialog.Builder(this).setTitle("이 내역을 가져올까요?").setMessage(summary.toString()).setNegativeButton("취소",null).setPositiveButton((plan.additions.size()+plan.openingAdditions.size())+"건 추가",(d,w)->{
             setBusy("내역을 저장하고 있어요");
             io.execute(()->{
                 try {
-                    Ledger.ImportPlan committed=db.importAtomic(read.entries);
-                    runOnUiThread(()->{clearBusy();if(!committed.errors.isEmpty()){error("가져오지 못했어요",joinErrors(committed.errors));return;} if(!committed.additions.isEmpty()){month=YearMonth.from(LocalDate.parse(committed.additions.get(0).date));selected=month.atDay(1);}render();toast(committed.additions.size()+"건을 추가했어요.");});
+                    Ledger.ImportPlan committed=db.importAtomic(read.entries,read.openingAssets);
+                    runOnUiThread(()->{clearBusy();if(!committed.errors.isEmpty()){error("가져오지 못했어요",joinErrors(committed.errors));return;} if(!committed.additions.isEmpty()){month=YearMonth.from(LocalDate.parse(committed.additions.get(0).date));selected=month.atDay(1);}render();toast((committed.additions.size()+committed.openingAdditions.size())+"건을 추가했어요.");});
                 } catch(Exception ex){runOnUiThread(()->{clearBusy();error("저장하지 못했어요",message(ex));});}
             });
         }).show();
@@ -746,7 +750,7 @@ public final class MainActivity extends Activity {
         PlanningData plan=db.planning();LinearLayout c=card(page);c.addView(text("이번 달 계획",18,INK,true));space(c,8);
         List<PlanningData.Limit> budgets=plan.effective(YearMonth.now(),"지출");for(PlanningData.Limit l:budgets)if(l.category.isEmpty()){PlanningData.Progress p=PlanningData.progress(l,YearMonth.now(),all);c.addView(label("생활비 "+won(p.actual)+" / "+won(p.target)+" · "+(p.remaining>=0?"남은 예산 "+won(p.remaining):"예산 초과 "+won(-p.remaining)),13,p.remaining<0?RED:MUTED));}
         long due=plan.repeats.stream().filter(r->r.due(LocalDate.now())).count();if(due>0){space(c,7);c.addView(label("확인할 반복 기록 "+due+"건",14,RED));}
-        space(c,12);c.addView(button("예산·목표·반복 관리",GREEN,true,()->{month=YearMonth.now();navigate(7);}));space(c,8);c.addView(button("자주 쓰는 기록",GREEN,false,this::pickFavorite));space(c,8);c.addView(button("월별 추이·전월 비교",GREEN,false,()->{month=YearMonth.now();trendSelected=month;navigate(8);}));
+        space(c,12);c.addView(button("예산·목표·반복 관리",GREEN,true,()->{month=YearMonth.now();navigate(7);}));space(c,8);c.addView(button("기초자산·현재 보유",GREEN,false,this::openingList));space(c,8);c.addView(button("자주 쓰는 기록",GREEN,false,this::pickFavorite));space(c,8);c.addView(button("월별 추이·전월 비교",GREEN,false,()->{month=YearMonth.now();trendSelected=month;navigate(8);}));
         if(backupStatus.stale(System.currentTimeMillis())){space(c,12);c.addView(button("전체 백업을 확인해 주세요",RED,false,()->navigate(3)));}
     }
     private Spinner spinner(LinearLayout form,String title,String[] values,String current){
@@ -808,7 +812,7 @@ public final class MainActivity extends Activity {
     private void loadArchive(Uri uri){setBusy("계획 포함 백업을 확인하고 있어요");io.execute(()->{try(InputStream in=getContentResolver().openInputStream(uri)){if(in==null)throw new IOException("파일을 열 수 없어요.");BackupArchive.Snapshot snapshot=BackupArchive.read(in);runOnUiThread(()->{clearBusy();previewArchive(snapshot);});}catch(Exception ex){runOnUiThread(()->{clearBusy();error("가져오지 못했어요",message(ex));});}});}
     private void previewArchive(BackupArchive.Snapshot snapshot){
         if(isFinishing()||isDestroyed())return;if(preferences.hasPin()&&!unlocked){pendingArchive=snapshot;return;}
-        try{Ledger.ImportPlan plan=Ledger.planImport(snapshot.entries,db.all());if(!plan.errors.isEmpty()){error("파일을 확인해 주세요",joinErrors(plan.errors));return;}PlanningData old=db.planning(),merged=PlanningData.merge(old,snapshot.planning);int added=merged.limits.size()+merged.repeats.size()+merged.favorites.size()-old.limits.size()-old.repeats.size()-old.favorites.size();String text="저축 이동 "+snapshot.movements.size()+"건 포함\n새 내역 "+plan.additions.size()+"건 · 중복 제외 "+plan.duplicates+"건\n새 계획 설정 "+added+"개\n\n기존 내역과 설정은 지우지 않아요. 같은 예산·목표 또는 같은 ID의 반복·자주 쓰는 기록은 현재 설정을 유지해요. 비밀번호와 화면 설정은 바꾸지 않아요.";
+        try{Ledger.ImportPlan plan=db.planImport(snapshot.entries,snapshot.openingAssets);if(!plan.errors.isEmpty()){error("파일을 확인해 주세요",joinErrors(plan.errors));return;}PlanningData old=db.planning(),merged=PlanningData.merge(old,snapshot.planning);int added=merged.limits.size()+merged.repeats.size()+merged.favorites.size()-old.limits.size()-old.repeats.size()-old.favorites.size();String text="기초자산 "+snapshot.openingAssets.size()+"건 포함\n저축 이동 "+snapshot.movements.size()+"건 포함\n새 내역 "+plan.additions.size()+"건 · 중복 제외 "+plan.duplicates+"건\n새 계획 설정 "+added+"개\n\n기존 내역과 설정은 지우지 않아요. 같은 예산·목표 또는 같은 ID의 반복·자주 쓰는 기록은 현재 설정을 유지해요. 비밀번호와 화면 설정은 바꾸지 않아요.";
             new AlertDialog.Builder(this).setTitle("계획 포함 백업 가져오기").setMessage(text).setNegativeButton("취소",null).setPositiveButton("확인하고 추가",(d,w)->{setBusy("내역과 계획을 저장하고 있어요");io.execute(()->{try{Ledger.ImportPlan committed=db.importPlanningAtomic(snapshot);runOnUiThread(()->{clearBusy();if(!committed.errors.isEmpty())error("가져오지 못했어요",joinErrors(committed.errors));else{render();toast("내역과 계획을 가져왔어요.");}});}catch(Exception ex){runOnUiThread(()->{clearBusy();error("저장하지 못했어요",message(ex));});}});}).show();
         }catch(Exception ex){error("백업을 확인해 주세요",message(ex));}
     }
@@ -835,8 +839,44 @@ public final class MainActivity extends Activity {
 
     private long movementAmount(EditText field){String value=field.getText().toString().trim().replace(",","");return value.isEmpty()||value.matches("0+")?0:Ledger.parseAmount(value);}
     private String movementText(SavingsMovement m){return m.date+" · "+m.source+" 해지\n기록한 원금 "+won(m.principal)+"\n실제 수령 "+won(m.received)+"\n"+(m.interest()>=0?"이자·수령차액 수입 ":"원금 대비 손실 ")+won(Math.abs(m.interest()))+"\n"+m.savingCategory+" 배분 "+won(m.saving)+"\n"+m.investmentCategory+" 투자 "+won(m.investment)+"\n"+(m.available()>=0?"사용 가능 금액으로 돌려놓음 ":"사용 가능 금액에서 추가로 채움 ")+won(Math.abs(m.available()))+"\n\n합계에는 이자·손실, 순저축 증감 "+won(m.saving-m.principal)+", 투자만 반영해요. 원금을 다시 수입으로 잡지 않아요.";}
-    private void movementList(){LinearLayout list=planForm();list.addView(label("이미 저축으로 기록한 원금을 해지해 예금·투자와 사용 가능 금액으로 나눠요. 원래 저축 기록은 보존해요.",14,INK));space(list,12);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("저축 해지·배분").setView(list).setPositiveButton("새 이동",(d,w)->movementEditor(null)).setNegativeButton("닫기",null).create();for(SavingsMovement m:db.movements()){TextView row=button(m.date+" · "+m.source+" → "+m.savingCategory+" / "+m.investmentCategory+"\n"+won(m.received),GREEN,false,()->{dialog.dismiss();movementEditor(m);});list.addView(row);space(list,8);}ScrollView scroll=new ScrollView(this);scroll.addView(list);dialog.setView(scroll);dialog.show();}
+    private void movementList(){LinearLayout list=planForm();list.addView(label("이미 저축으로 기록한 원금을 해지해 예금·투자와 사용 가능 금액으로 나눠요. 원래 저축 기록은 보존해요. 이전 원금은 기초자산으로 분리하고 새 이동은 실제 원금 회수·재가입을 각각 기록해요.",14,INK));space(list,12);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("저축 해지·배분").setView(list).setPositiveButton("새 이동",(d,w)->movementEditor(null)).setNegativeButton("닫기",null).create();for(SavingsMovement m:db.movements()){TextView row=button(m.date+" · "+m.source+" → "+m.savingCategory+" / "+m.investmentCategory+"\n"+won(m.received),GREEN,false,()->{dialog.dismiss();movementEditor(m);});list.addView(row);space(list,8);}ScrollView scroll=new ScrollView(this);scroll.addView(list);dialog.setView(scroll);dialog.show();}
+    private void openingList(){
+        LinearLayout list=planForm();list.addView(label("기록을 시작하기 전에 갖고 있던 돈을 등록하세요. 수입이나 올해 납입액에 더하지 않아요. 기초자산 기준일 이후 거래를 합쳐 보유 금액을 계산해요. 투자 금액은 평가액이 아닌 기록한 원금이에요.",13,MUTED));space(list,12);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("기초자산·현재 보유").setNegativeButton("닫기",null).setPositiveButton("기초자산 추가",(d,w)->openingEditor(null)).create();
+        list.addView(text(LocalDate.now()+" 기준 보유",16,INK,true));for(Map.Entry<String,Long> value:OpeningAsset.balances(db.openingAssets(),db.all(),LocalDate.now().toString()).entrySet())valueRow(list,value.getKey(),value.getValue(),GREEN,14,false,0);
+        space(list,16);list.addView(text("등록한 기초자산",16,INK,true));if(db.openingAssets().isEmpty())list.addView(label("등록된 기초자산이 없어요.",13,MUTED));
+        for(OpeningAsset a:db.openingAssets()){space(list,8);TextView item=button(a.date+" · "+a.kind+" · "+a.category+"\n"+won(a.amount),GREEN,false,()->{dialog.dismiss();openingEditor(a);});item.setContentDescription("기초자산 "+a.id+" 수정");list.addView(item);}
+        ScrollView scroll=new ScrollView(this);scroll.addView(list);dialog.setView(scroll);dialog.show();
+    }
+    private void openingEditor(OpeningAsset old){
+        if(old!=null&&old.id.startsWith("move-base:")){SavingsMovement m=db.movement(old.id.substring(10));if(m!=null){movementEditor(m);return;}}
+        LinearLayout form=planForm();form.addView(label("기록 시작 시 이미 갖고 있던 돈이에요. 기존 거래를 중복해 기초자산으로 넣지 마세요. 거래 내역과 수입·납입 통계는 바꾸지 않아요.",13,MUTED));space(form,12);
+        EditText date=field(form,"기초자산 기준일",old==null?LocalDate.now().withDayOfYear(1).toString():old.date,android.text.InputType.TYPE_CLASS_TEXT);date.setFocusable(false);date.setOnClickListener(v->datePicker(LocalDate.parse(date.getText().toString()),"기초자산 기준일",(view,y,m,d)->date.setText(LocalDate.of(y,m+1,d).toString())).show());
+        Spinner kind=spinner(form,"기초자산 종류",OpeningAsset.KINDS,old==null?"저축":old.kind);EditText category=field(form,"기초자산 상세 분류",old==null?"":old.category,android.text.InputType.TYPE_CLASS_TEXT);EditText amount=field(form,"기초자산 금액 (원)",old==null?"":String.valueOf(old.amount),android.text.InputType.TYPE_CLASS_NUMBER);EditText memo=field(form,"기초자산 메모",old==null?"":old.memo,android.text.InputType.TYPE_CLASS_TEXT);
+        ScrollView scroll=new ScrollView(this);scroll.addView(form);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("기초자산 입력").setView(scroll).setNegativeButton("취소",null).setPositiveButton("저장",null).setNeutralButton(old==null?"안내":"삭제",null).create();
+        dialog.setOnShowListener(d->{dialog.getButton(-1).setOnClickListener(v->{try{db.saveOpening(new OpeningAsset(old==null?UUID.randomUUID().toString():old.id,date.getText().toString(),kind.getSelectedItem().toString(),Ledger.parseAmount(amount.getText().toString()),category.getText().toString(),memo.getText().toString()),old!=null);hideKeyboard();dialog.dismiss();render();openingList();}catch(Exception ex){error("기초자산을 확인해 주세요",message(ex));}});dialog.getButton(-3).setOnClickListener(v->{if(old==null)error("기초자산 안내","예: 올해 시작 전 예시적금에6,500,000원이 있었다면 저축/예시적금로 등록해요. 올해 납입한3,500,000원은 기존 거래에만 둡니다.");else new AlertDialog.Builder(this).setTitle("이 기초자산을 삭제할까요?").setMessage("거래 내역은 삭제하지 않아요. 보유 금액 계산의 시작 잔액만 바뀌어요.").setNegativeButton("취소",null).setPositiveButton("삭제",(x,y)->{db.deleteOpening(old.id);dialog.dismiss();render();openingList();}).show();});});dialog.show();
+    }
     private void movementEditor(SavingsMovement old){
+        if(old!=null&&!old.detailed){legacyMovementEditor(old);return;}
+        LinearLayout form=planForm();form.addView(label("해지 원금과 재가입은 실제 금액을 적으세요. 이전 원금은 기초자산으로 분리해 수입에 넣지 않아요. 이미 수동으로 같은 해지·재가입을 기록했다면 중복 저장하지 마세요.",13,MUTED));space(form,12);
+        EditText date=field(form,"해지 날짜",old==null?LocalDate.now().toString():old.date,android.text.InputType.TYPE_CLASS_TEXT);date.setFocusable(false);date.setOnClickListener(v->datePicker(LocalDate.parse(date.getText().toString()),"해지 날짜",(view,y,m,d)->date.setText(LocalDate.of(y,m+1,d).toString())).show());
+        EditText source=field(form,"해지한 저축 분류",old==null?"적금":old.source,android.text.InputType.TYPE_CLASS_TEXT);
+        EditText principal=field(form,"실제 해지 원금 (원)",old==null?"":String.valueOf(old.principal),android.text.InputType.TYPE_CLASS_NUMBER);
+        EditText previous=field(form,"이전부터 보유한 원금 (원)",old==null?"0":String.valueOf(old.previousPrincipal),android.text.InputType.TYPE_CLASS_NUMBER);
+        CheckBox create=new CheckBox(this);create.setText("이전 원금을 기초자산에 함께 등록 (해지 연도 1월1일)");create.setContentDescription("기초자산 함께 등록");create.setTextColor(INK);create.setChecked(old==null||old.createOpening);form.addView(create);form.addView(label("이미 기초자산에 등록했다면 위 선택을 끄세요. 다른 기준일을 쓰면 기초자산 화면에서 먼저 등록하세요. 모든 기초자산 기준일과 기존 분류 이름을 맞춰 주세요.",12,MUTED));
+        EditText received=field(form,"실제 수령액 (원)",old==null?"":String.valueOf(old.received),android.text.InputType.TYPE_CLASS_NUMBER);
+        EditText government=field(form,"수령액에 포함된 정부기여금 (원)",old==null?"0":String.valueOf(old.government),android.text.InputType.TYPE_CLASS_NUMBER);
+        EditText saving=field(form,"예금·저축에 넣을 금액 (원)",old==null?"0":String.valueOf(old.saving),android.text.InputType.TYPE_CLASS_NUMBER);
+        EditText savingCat=field(form,"받는 저축 분류",old==null?"예금":old.savingCategory,android.text.InputType.TYPE_CLASS_TEXT);
+        EditText investment=field(form,"투자에 넣을 금액 (원)",old==null?"0":String.valueOf(old.investment),android.text.InputType.TYPE_CLASS_NUMBER);
+        EditText investmentCat=field(form,"받는 투자 분류",old==null?"주식":old.investmentCategory,android.text.InputType.TYPE_CLASS_TEXT);EditText memo=field(form,"이동 메모",old==null?"":old.memo,android.text.InputType.TYPE_CLASS_TEXT);
+        ScrollView scroll=new ScrollView(this);scroll.addView(form);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("저축 해지·배분 입력").setView(scroll).setNegativeButton("취소",null).setPositiveButton("미리보기",null).setNeutralButton(old==null?"안내":"이동 삭제",null).create();String id=old==null?UUID.randomUUID().toString():old.id;
+        dialog.setOnShowListener(d->{dialog.getButton(-1).setOnClickListener(v->{try{long prior=movementAmount(previous);SavingsMovement m=new SavingsMovement(id,date.getText().toString(),source.getText().toString(),movementAmount(principal),movementAmount(received),movementAmount(saving),savingCat.getText().toString(),movementAmount(investment),investmentCat.getText().toString(),memo.getText().toString(),prior,movementAmount(government),create.isChecked()&&prior>0,true);
+            String previewText="실제 원금 회수 "+won(m.principal)+"\n이전 원금 "+won(m.previousPrincipal)+(m.createOpening?" · 기초자산 함께 등록":" · 기존 기초자산 사용")+"\n이자·수령차액 "+won(m.interest())+"\n정부기여금 수입 "+won(m.government)+"\n"+m.savingCategory+" 재가입 "+won(m.saving)+"\n"+m.investmentCategory+" 투자 "+won(m.investment)+"\n이번 배분 후 남는 돈 "+won(m.available())+"\n\n원금을 수입에 넣지 않아요. 올해 순저축은 기존 납입과 원금 회수·재가입을 합산해 계산해요. 기초자산은 통계에 더하지 않아요.";
+            AlertDialog preview=new AlertDialog.Builder(this).setTitle("이동 결과 확인").setMessage(previewText).setNegativeButton("다시 입력",null).setPositiveButton("확인하고 저장",null).create();preview.setOnShowListener(x->preview.getButton(-1).setOnClickListener(y->{try{db.saveMovement(m,false);selected=LocalDate.parse(m.date);month=YearMonth.from(selected);if(tab==2)saveStatisticsPeriod();preview.dismiss();dialog.dismiss();render();toast("실제 금액과 이전 원금을 나눠 저장했어요.");}catch(Exception ex){error("저장하지 못했어요",message(ex));}}));preview.show();
+        }catch(Exception ex){error("입력값을 확인해 주세요",message(ex));}});dialog.getButton(-3).setOnClickListener(v->{if(old==null)error("기록 예시","원금10,000,000원 / 이전 원금6,500,000원 / 수령10,200,000원 / 정부기여금80,000원 / 예금8,000,000원 / 투자1,500,000원. 이자120,000원과 남는 돈700,000원을 자동 계산해요.");else new AlertDialog.Builder(this).setTitle("이동과 연결 기록을 삭제할까요?").setMessage("이동에서 만든 회수·재가입·이자·기여금·투자와 연결 기초자산을 함께 삭제해요. 원래 납입과 따로 등록한 기초자산은 유지해요.").setNegativeButton("취소",null).setPositiveButton("삭제",(x,y)->{try{db.saveMovement(old,true);dialog.dismiss();render();}catch(Exception ex){error("삭제하지 못했어요",message(ex));}}).show();});});dialog.show();
+    }
+    private void legacyMovementEditor(SavingsMovement old){
         LinearLayout form=planForm();form.addView(label("기존 저축 기록에 반영된 원금만 입력하세요. 실제 받은 금액과 예금·투자 배분액을 따로 적습니다. 남는 금액은 사용 가능 금액으로 돌아오고, 모자라는 금액은 사용 가능 금액에서 채워요.",13,MUTED));space(form,12);
         EditText date=field(form,"해지 날짜",old==null?LocalDate.now().toString():old.date,android.text.InputType.TYPE_CLASS_TEXT);date.setFocusable(false);date.setOnClickListener(v->datePicker(LocalDate.parse(date.getText().toString()),"해지 날짜",(view,y,m,d)->date.setText(LocalDate.of(y,m+1,d).toString())).show());
         EditText source=field(form,"해지한 저축 분류",old==null?"적금":old.source,android.text.InputType.TYPE_CLASS_TEXT);

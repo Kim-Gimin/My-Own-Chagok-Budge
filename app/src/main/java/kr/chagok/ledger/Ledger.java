@@ -90,6 +90,8 @@ public final class Ledger {
         public final List<Entry> additions = new ArrayList<>();
         public final List<String> errors = new ArrayList<>();
         public int duplicates;
+        public final List<OpeningAsset> openingAdditions=new ArrayList<>();
+        public int openingDuplicates;
     }
     public static ImportPlan planImport(List<Entry> input, List<Entry> existing) {
         ImportPlan plan = new ImportPlan();

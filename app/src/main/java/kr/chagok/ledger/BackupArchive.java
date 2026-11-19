@@ -7,12 +7,20 @@ import java.util.zip.*;
 /** Local portable snapshot of entries and planning only. Never contains a PIN or UI preferences. */
 final class BackupArchive {
     static final int LIMIT=40*1024*1024;
-    static final class Snapshot {final List<Ledger.Entry> entries;final PlanningData planning;final List<SavingsMovement> movements;Snapshot(List<Ledger.Entry> entries,PlanningData planning){this(entries,planning,new ArrayList<>());}Snapshot(List<Ledger.Entry> entries,PlanningData planning,List<SavingsMovement> movements){this.entries=entries;this.planning=planning;this.movements=movements;}}
+    static final class Snapshot {
+        final List<Ledger.Entry> entries;final PlanningData planning;final List<SavingsMovement> movements;final List<OpeningAsset> openingAssets;
+        Snapshot(List<Ledger.Entry> e,PlanningData p){this(e,p,new ArrayList<>());}
+        Snapshot(List<Ledger.Entry> e,PlanningData p,List<SavingsMovement> m){this(e,p,m,new ArrayList<>());}
+        Snapshot(List<Ledger.Entry> e,PlanningData p,List<SavingsMovement> m,List<OpeningAsset> a){entries=e;planning=p;movements=m;openingAssets=a;}
+    }
     static void write(OutputStream stream,List<Ledger.Entry> entries,PlanningData planning)throws Exception{
         write(stream,entries,planning,new ArrayList<>());
     }
     static void write(OutputStream stream,List<Ledger.Entry> entries,PlanningData planning,List<SavingsMovement> movements)throws Exception{
-        ByteArrayOutputStream xlsx=new ByteArrayOutputStream();XlsxIO.write(xlsx,entries,false);
+        write(stream,entries,planning,movements,Collections.emptyList());
+    }
+    static void write(OutputStream stream,List<Ledger.Entry> entries,PlanningData planning,List<SavingsMovement> movements,List<OpeningAsset> opening)throws Exception{
+        ByteArrayOutputStream xlsx=new ByteArrayOutputStream();XlsxIO.write(xlsx,entries,false,opening);
         try(ZipOutputStream zip=new ZipOutputStream(stream)){part(zip,"format.txt",("CHAGOK-PLANNING-BACKUP-"+(movements.isEmpty()?"1":"2")).getBytes(StandardCharsets.UTF_8));part(zip,"내역.xlsx",xlsx.toByteArray());part(zip,"계획.dat",planning.encode().getBytes(StandardCharsets.US_ASCII));if(!movements.isEmpty())part(zip,"저축이동.dat",SavingsMovement.encodeAll(movements).getBytes(StandardCharsets.US_ASCII));zip.finish();zip.flush();}
     }
     static void part(ZipOutputStream zip,String name,byte[] bytes)throws IOException{zip.putNextEntry(new ZipEntry(name));zip.write(bytes);zip.closeEntry();}
@@ -22,6 +30,6 @@ final class BackupArchive {
         String version=parts.containsKey("format.txt")?new String(parts.get("format.txt"),StandardCharsets.UTF_8):"";
         if(!((parts.size()==3&&version.equals("CHAGOK-PLANNING-BACKUP-1"))||(parts.size()==4&&parts.containsKey("저축이동.dat")&&version.equals("CHAGOK-PLANNING-BACKUP-2")))||!parts.containsKey("내역.xlsx")||!parts.containsKey("계획.dat"))throw new IOException("지원하지 않는 백업 형식이에요.");
         XlsxIO.ReadResult read=XlsxIO.read(new ByteArrayInputStream(parts.get("내역.xlsx")));if(read.invalidRows>0)throw new IOException("백업 내역에 오류가 있어요.");
-        return new Snapshot(read.entries,PlanningData.decode(new String(parts.get("계획.dat"),StandardCharsets.US_ASCII)),parts.containsKey("저축이동.dat")?SavingsMovement.decodeAll(new String(parts.get("저축이동.dat"),StandardCharsets.US_ASCII)):new ArrayList<>());
+        return new Snapshot(read.entries,PlanningData.decode(new String(parts.get("계획.dat"),StandardCharsets.US_ASCII)),parts.containsKey("저축이동.dat")?SavingsMovement.decodeAll(new String(parts.get("저축이동.dat"),StandardCharsets.US_ASCII)):new ArrayList<>(),read.openingAssets);
     }
 }
