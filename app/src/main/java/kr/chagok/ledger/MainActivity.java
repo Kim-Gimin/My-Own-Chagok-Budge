@@ -37,7 +37,8 @@ public final class MainActivity extends Activity {
     private Typeface appFont=Typeface.DEFAULT;
     private boolean unlocked;
     private boolean stopped;
-    private Dialog lockDialog;
+    private Dialog lockDialog,exitDialog;
+    private Runnable unregisterBack,unregisterExitBack;
     private XlsxIO.ReadResult pendingRead;
     private Ledger.ImportPlan pendingPlan;
     private String pendingErrorTitle,pendingError;
@@ -52,7 +53,7 @@ public final class MainActivity extends Activity {
     private int statisticsMode=StatisticsPeriod.MONTH,statisticsYear=LocalDate.now().getYear();
     private LocalDate statisticsFrom=LocalDate.now().withDayOfMonth(1),statisticsTo=LocalDate.now();
     private LocalDate renderedStatisticsToday;
-    private int settlementMode,settlementYear=LocalDate.now().getYear(),settingsReturnTab=5;
+    private int settlementMode,settlementYear=LocalDate.now().getYear();
     private YearMonth periodFrom=YearMonth.of(LocalDate.now().getYear(),1),periodTo=YearMonth.of(LocalDate.now().getYear(),12);
     private String search="";
     private boolean recordsAll=true;
@@ -86,7 +87,7 @@ public final class MainActivity extends Activity {
             selected=LocalDate.parse(state.getString("selected",selected.toString()));
             tab=state.containsKey("statisticsType")?state.getInt("tab",tab):tab; statisticsType=state.getInt("statisticsType",-1);if(statisticsType< -1||statisticsType>=Ledger.TYPES.length)statisticsType=-1; filter=state.getInt("filter"); search=state.getString("search","");
             statisticsMode=state.getInt("statisticsMode",statisticsMode);statisticsYear=state.getInt("statisticsYear",statisticsYear);statisticsFrom=LocalDate.parse(state.getString("statisticsFrom",statisticsFrom.toString()));statisticsTo=LocalDate.parse(state.getString("statisticsTo",statisticsTo.toString()));
-            settlementMode=state.getInt("settlementMode");settlementYear=state.getInt("settlementYear",settlementYear);settingsReturnTab=state.getInt("settingsReturnTab",5);
+            settlementMode=state.getInt("settlementMode");settlementYear=state.getInt("settlementYear",settlementYear);
             periodFrom=YearMonth.parse(state.getString("periodFrom",periodFrom.toString()));periodTo=YearMonth.parse(state.getString("periodTo",periodTo.toString()));
             comparisonRotation=state.getFloat("comparisonRotation",0);
             float[] rotations=state.getFloatArray("rotations");if(rotations!=null)System.arraycopy(rotations,0,chartRotations,0,Math.min(rotations.length,chartRotations.length));
@@ -96,20 +97,58 @@ public final class MainActivity extends Activity {
         if(state!=null){guideSection=state.getInt("guideSection",-1);planSection=state.getInt("planSection",0);trendMonths=state.getInt("trendMonths",6);String tm=state.getString("trendSelected");if(tm!=null)trendSelected=YearMonth.parse(tm);}
         if(getIntent().getBooleanExtra("open_backup",false))tab=3;
         render();
+        if(Build.VERSION.SDK_INT>=33)unregisterBack=BackApi33.register(this,this::handleBack);
     }
     @Override public void onSaveInstanceState(Bundle out) {
         out.putInt("guideSection",guideSection);out.putInt("planSection",planSection);out.putInt("trendMonths",trendMonths);if(trendSelected!=null)out.putString("trendSelected",trendSelected.toString());
         super.onSaveInstanceState(out); out.putString("month",month.toString()); out.putString("selected",selected.toString());
         out.putInt("tab",tab); out.putInt("statisticsType",statisticsType); out.putInt("filter",filter); out.putString("search",search);
-        out.putInt("settlementMode",settlementMode);out.putInt("settlementYear",settlementYear);out.putInt("settingsReturnTab",settingsReturnTab);out.putString("periodFrom",periodFrom.toString());out.putString("periodTo",periodTo.toString());
+        out.putInt("settlementMode",settlementMode);out.putInt("settlementYear",settlementYear);out.putString("periodFrom",periodFrom.toString());out.putString("periodTo",periodTo.toString());
         out.putFloatArray("rotations",chartRotations);out.putFloat("comparisonRotation",comparisonRotation);
         out.putInt("statisticsMode",statisticsMode);out.putInt("statisticsYear",statisticsYear);out.putString("statisticsFrom",statisticsFrom.toString());out.putString("statisticsTo",statisticsTo.toString());
         if(pendingExportMonth!=null) out.putString("exportMonth",pendingExportMonth.toString());
         out.putBoolean("recordsAll",recordsAll);out.putInt("recordSort",recordSort);out.putStringArrayList("recordCategories",new ArrayList<>(recordCategories));
     }
     @Override public void onResume(){super.onResume();stopped=false;if(preferences!=null && preferences.hasPin() && !unlocked)render();else if(tab==2&&statisticsMode==StatisticsPeriod.YTD&&!LocalDate.now().equals(renderedStatisticsToday))render();else if(tab==1&&historyRail!=null){historyActions.endScroll();updateHistoryActions(false);}}
-    @Override public void onStop(){stopped=true;if(historyRail!=null&&revealHistoryRail!=null)historyRail.removeCallbacks(revealHistoryRail);if(preferences!=null && preferences.hasPin() && !isChangingConfigurations())unlocked=false;super.onStop();}
-    @Override public void onBackPressed(){if(preferences.hasPin()&&!unlocked){super.onBackPressed();return;}if(tab==9){tab=6;render();}else if(tab==6){tab=settingsReturnTab;render();}else super.onBackPressed();}
+    @Override public void onStop(){stopped=true;dismissExitDialog();if(historyRail!=null&&revealHistoryRail!=null)historyRail.removeCallbacks(revealHistoryRail);if(preferences!=null && preferences.hasPin() && !isChangingConfigurations())unlocked=false;super.onStop();}
+    @Override public void onBackPressed(){handleBack();}
+    private void handleBack(){
+        if(isFinishing()||isDestroyed()||resetting)return;
+        if(preferences.hasPin()&&!unlocked){finish();return;}
+        if(busy){toast("진행 중인 작업이 끝난 뒤 다시 시도해 주세요.");return;}
+        if(exitDialog!=null&&exitDialog.isShowing()){closeApp();return;}
+        if(tab==9)navigate(6);else if(tab!=5)navigate(5);else showExitDialog();
+    }
+    private void dismissExitDialog(){
+        Dialog dialog=exitDialog;exitDialog=null;
+        if(unregisterExitBack!=null){unregisterExitBack.run();unregisterExitBack=null;}
+        if(dialog!=null)dialog.dismiss();
+    }
+    private void closeApp(){dismissExitDialog();finishAndRemoveTask();}
+    private void showExitDialog(){
+        if(exitDialog!=null||isFinishing()||isDestroyed())return;
+        LinearLayout form=column();form.setPadding(dp(26),dp(26),dp(26),dp(20));form.setBackground(bg(SURFACE,24));
+        form.addView(text("알림",18,INK,true));space(form,30);
+        TextView message=label("뒤로가기를 한 번 더 누르시거나 앱 종료 버튼을 누르시면 앱이 종료돼요.",16,INK);message.setLineSpacing(dp(5),1);form.addView(message);space(form,30);
+        LinearLayout actions=row();TextView exit=button("앱 종료",RED,false,this::closeApp),cancel=button("취소",GREEN,false,this::dismissExitDialog);
+        actions.addView(exit,new LinearLayout.LayoutParams(0,-2,1));LinearLayout.LayoutParams right=new LinearLayout.LayoutParams(0,-2,1);right.leftMargin=dp(12);actions.addView(cancel,right);form.addView(actions);
+        ScrollView scroll=new ScrollView(this);scroll.addView(form);Dialog dialog=new Dialog(this);exitDialog=dialog;dialog.setContentView(scroll);
+        dialog.setCancelable(true);dialog.setCanceledOnTouchOutside(false);dialog.setOnCancelListener(d->closeApp());
+        dialog.setOnDismissListener(d->{if(exitDialog==dialog){exitDialog=null;if(unregisterExitBack!=null){unregisterExitBack.run();unregisterExitBack=null;}}});
+        Window window=dialog.getWindow();window.setBackgroundDrawableResource(android.R.color.transparent);window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);window.setDimAmount(.55f);
+        if(preferences.hasPin())window.addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        dialog.show();window.setLayout(Math.min(getResources().getDisplayMetrics().widthPixels-dp(40),dp(440)),WindowManager.LayoutParams.WRAP_CONTENT);
+        if(Build.VERSION.SDK_INT>=33)unregisterExitBack=BackApi33.register(dialog,this::closeApp);
+    }
+    /** Isolate API33-only classes so older supported Android versions do not load them. */
+    private static final class BackApi33 {
+        static Runnable register(Activity activity,Runnable action){return register(activity.getOnBackInvokedDispatcher(),action);}
+        static Runnable register(Dialog dialog,Runnable action){return register(dialog.getOnBackInvokedDispatcher(),action);}
+        private static Runnable register(android.window.OnBackInvokedDispatcher dispatcher,Runnable action){
+            android.window.OnBackInvokedCallback callback=action::run;dispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,callback);
+            return ()->dispatcher.unregisterOnBackInvokedCallback(callback);
+        }
+    }
     private void applyAppearance(){
         setTheme(getResources().getIdentifier(preferences.dark()?"AppThemeDark":"AppTheme","style",getPackageName()));
         if(preferences.dark()){BG=0xFF2C3646;SURFACE=0xFF333D50;INPUT=0xFF3B4659;SUBTLE=0xFF3B4659;INK=0xFFE6E7E0;MUTED=0xFFAFB7C4;LINE=0xFF414B5E;GREEN=0xFF35A0EF;RED=0xFFEF4A87;PINK=RED;PURPLE=0xFFB6A2EA;}
@@ -120,6 +159,7 @@ public final class MainActivity extends Activity {
         if(preferences.hasPin())getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
     }
     @Override public void onDestroy() {
+        dismissExitDialog();if(unregisterBack!=null){unregisterBack.run();unregisterBack=null;}
         clearHistoryActions();
         if(lockDialog!=null){lockDialog.dismiss();lockDialog=null;}
         if(progress!=null) { progress.dismiss(); progress=null; }
@@ -170,7 +210,7 @@ public final class MainActivity extends Activity {
             TextView monthTitle=text(statisticsTitle(),20,INK,true);monthTitle.setSingleLine(true);monthTitle.setHorizontallyScrolling(false);monthTitle.setAutoSizeTextTypeUniformWithConfiguration(10,20,1,TypedValueCompat.SP);monthTitle.setGravity(Gravity.CENTER);monthTitle.setContentDescription("통계 기간 선택");monthTitle.setOnClickListener(v->{if(statisticsMode==StatisticsPeriod.MONTH)pickMonth();else if(statisticsMode==StatisticsPeriod.YEAR)pickStatisticsYear();else if(statisticsMode==StatisticsPeriod.CUSTOM)pickStatisticsDates();else new AlertDialog.Builder(this).setTitle("올해 누적").setMessage("올해 1월 1일부터 오늘까지의 내역을 집계해요. 미래 날짜의 기록은 포함하지 않아요.").setPositiveButton("확인",null).show();});header.addView(monthTitle,new LinearLayout.LayoutParams(0,dp(36),1));
             if(canMove)header.addView(monthArrow("›",statisticsMode==StatisticsPeriod.MONTH?"다음 달":"다음 연도",()->moveStatistics(1)));
         }else if(tab==4 || tab==5 || tab==6 || tab==3 || tab==1 || tab==7 || tab==8 || tab==9){
-            header.addView(tab==9?headerIcon("back","설명서 뒤로",()->{tab=6;render();}):tab==6?headerIcon("back","설정 뒤로",()->{tab=settingsReturnTab;render();}):headerIcon("menu","메뉴 열기",this::showMenu),headerIconParams());
+            header.addView(tab==9?headerIcon("back","설명서 뒤로",()->navigate(6)):tab==6?headerIcon("back","설정 뒤로",()->navigate(5)):headerIcon("menu","메뉴 열기",this::showMenu),headerIconParams());
             if(tab==4)header.addView(new View(this),new LinearLayout.LayoutParams(dp(51),1));
             String caption=tab==9?"설명서":tab==7?"예산·목표·반복":tab==8?"월별 추이·비교":tab==1?(recordsAll?"전체 내역":month.format(DateTimeFormatter.ofPattern("yyyy년 M월"))+" 내역"):tab==4?"결산":tab==5?LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy년 M월 d일 EEEE",Locale.KOREA)):tab==6?"설정":"엑셀 백업·가져오기";
             TextView title=text(caption,tab==5?16:20,INK,true);title.setSingleLine(true);title.setHorizontallyScrolling(false);title.setGravity(Gravity.CENTER);title.setAutoSizeTextTypeUniformWithConfiguration(11,tab==5?16:20,1,TypedValueCompat.SP);header.addView(title,new LinearLayout.LayoutParams(0,dp(HEADER_TOUCH),1));
@@ -210,7 +250,7 @@ public final class MainActivity extends Activity {
     private View headerIcon(String kind,String description,Runnable action){IconView icon=new IconView(kind,INK);int inset=dp((HEADER_TOUCH-HEADER_ICON)/2f);icon.setPadding(inset,inset,inset,inset);icon.setContentDescription(description);icon.setFocusable(true);icon.setClickable(true);icon.setBackground(headerRipple());icon.setOnClickListener(v->action.run());return icon;}
     private LinearLayout.LayoutParams headerIconParams(){return new LinearLayout.LayoutParams(dp(HEADER_TOUCH),dp(HEADER_TOUCH));}
     private android.graphics.drawable.Drawable headerRipple(){GradientDrawable mask=new GradientDrawable();mask.setShape(GradientDrawable.OVAL);mask.setColor(Color.WHITE);return new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(preferences.dark()?0x33FFFFFF:0x1F000000),null,mask);}
-    private void navigate(int target){hideKeyboard();if(target==6)settingsReturnTab=tab;if(target==1)recordsAll=true;tab=target;displayLimit=100;render();}
+    private void navigate(int target){dismissExitDialog();hideKeyboard();if(target==1)recordsAll=true;tab=target;displayLimit=100;render();}
     private void showMenu(){String[] names={"저축 해지·배분","기초자산·현재 보유","결산","원형·막대 통계","월별 추이·전월 비교","예산·목표·반복·자주 쓰는 기록","홈","달력","내역","엑셀 백업·가져오기","설정"};int[] targets={-1,-2,4,2,8,7,5,0,1,3,6};new AlertDialog.Builder(this).setTitle("메뉴").setItems(names,(d,i)->{if(targets[i]==-2)openingList();else if(targets[i]<0)movementList();else navigate(targets[i]);}).setNegativeButton("닫기",null).show();}
     private void settlements(){
         LinearLayout controls=column();controls.setPadding(dp(18),0,dp(18),dp(12));LinearLayout tabs=row();

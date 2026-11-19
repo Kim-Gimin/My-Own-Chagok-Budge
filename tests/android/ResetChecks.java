@@ -80,7 +80,7 @@ final class ResetChecks {
         try(OutputStream out=ctx.getContentResolver().openOutputStream(uri)){bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();
     }
     static void verify(DeviceChecks t)throws Exception {
-        Context ctx=t.getTargetContext();t.eq("0.8.5",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
+        Context ctx=t.getTargetContext();t.eq("0.8.6",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
         for(String name:new String[]{"app_preferences","category_choices","backup_status"})t.eq(true,ctx.getSharedPreferences(name,0).getAll().isEmpty());
         t.eq(false,new File(ctx.getFilesDir(),"reset-private-sentinel").exists());t.eq(false,new File(ctx.getCacheDir(),"reset-cache-sentinel").exists());
         t.eq(null,ctx.getSystemService(JobScheduler.class).getPendingJob(BackupReminderService.JOB));
