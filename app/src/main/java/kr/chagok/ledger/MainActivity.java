@@ -50,7 +50,11 @@ public final class MainActivity extends Activity {
     private int settlementMode,settlementYear=LocalDate.now().getYear(),settingsReturnTab=5;
     private YearMonth periodFrom=YearMonth.of(LocalDate.now().getYear(),1),periodTo=YearMonth.of(LocalDate.now().getYear(),12);
     private String search="";
+    private boolean recordsAll=true;
+    private int recordSort=HistoryData.DATE;
+    private Set<String> recordCategories=new HashSet<>();
     private LinearLayout root,page,recordList;
+    private LinearLayout recordFooter;
     private LinearLayout bodyContent;
     private ScrollView pageScroll;
     private AlertDialog progress;
@@ -66,6 +70,7 @@ public final class MainActivity extends Activity {
         tab=preferences.startTab();appFont=preferences.font();applyAppearance();unlocked=!preferences.hasPin();
         statisticsMode=preferences.statisticsMode();statisticsYear=preferences.statisticsYear();month=preferences.statisticsMonth();statisticsFrom=preferences.statisticsDate(true);statisticsTo=preferences.statisticsDate(false);
         if(statisticsFrom.isAfter(statisticsTo)){statisticsFrom=LocalDate.now().withDayOfMonth(1);statisticsTo=LocalDate.now();}
+        recordSort=preferences.recordSort();
         if(state!=null) {
             month=YearMonth.parse(state.getString("month",month.toString()));
             selected=LocalDate.parse(state.getString("selected",selected.toString()));
@@ -75,6 +80,7 @@ public final class MainActivity extends Activity {
             periodFrom=YearMonth.parse(state.getString("periodFrom",periodFrom.toString()));periodTo=YearMonth.parse(state.getString("periodTo",periodTo.toString()));
             float[] rotations=state.getFloatArray("rotations");if(rotations!=null&&rotations.length==3)chartRotations=rotations;
             String exportMonth=state.getString("exportMonth"); if(exportMonth!=null) pendingExportMonth=YearMonth.parse(exportMonth);
+            recordsAll=state.getBoolean("recordsAll",true);recordSort=state.getInt("recordSort",recordSort);ArrayList<String> categoryState=state.getStringArrayList("recordCategories");if(categoryState!=null)recordCategories=new HashSet<>(categoryState);
         }
         render();
     }
@@ -85,6 +91,7 @@ public final class MainActivity extends Activity {
         out.putFloatArray("rotations",chartRotations);
         out.putInt("statisticsMode",statisticsMode);out.putInt("statisticsYear",statisticsYear);out.putString("statisticsFrom",statisticsFrom.toString());out.putString("statisticsTo",statisticsTo.toString());
         if(pendingExportMonth!=null) out.putString("exportMonth",pendingExportMonth.toString());
+        out.putBoolean("recordsAll",recordsAll);out.putInt("recordSort",recordSort);out.putStringArrayList("recordCategories",new ArrayList<>(recordCategories));
     }
     @Override public void onResume(){super.onResume();stopped=false;if(preferences!=null && preferences.hasPin() && !unlocked)render();else if(tab==2&&statisticsMode==StatisticsPeriod.YTD&&!LocalDate.now().equals(renderedStatisticsToday))render();}
     @Override public void onStop(){stopped=true;if(preferences!=null && preferences.hasPin() && !isChangingConfigurations())unlocked=false;super.onStop();}
@@ -141,10 +148,11 @@ public final class MainActivity extends Activity {
             if(canMove){TextView prev=text("‹",29,INK,false);prev.setGravity(Gravity.CENTER);prev.setContentDescription(statisticsMode==StatisticsPeriod.MONTH?"이전 달":"이전 연도");prev.setOnClickListener(v->moveStatistics(-1));header.addView(prev,new LinearLayout.LayoutParams(dp(36),dp(36)));}
             TextView monthTitle=text(statisticsTitle(),20,INK,true);monthTitle.setSingleLine(true);monthTitle.setAutoSizeTextTypeUniformWithConfiguration(13,20,1,TypedValueCompat.SP);monthTitle.setGravity(Gravity.CENTER);monthTitle.setContentDescription("통계 기간 선택");monthTitle.setOnClickListener(v->{if(statisticsMode==StatisticsPeriod.MONTH)pickMonth();else if(statisticsMode==StatisticsPeriod.YEAR)pickStatisticsYear();else if(statisticsMode==StatisticsPeriod.CUSTOM)pickStatisticsDates();else new AlertDialog.Builder(this).setTitle("올해 누적").setMessage("올해 1월 1일부터 오늘까지의 내역을 집계해요. 미래 날짜의 기록은 포함하지 않아요.").setPositiveButton("확인",null).show();});header.addView(monthTitle,new LinearLayout.LayoutParams(0,dp(36),1));
             if(canMove){TextView next=text("›",29,INK,false);next.setGravity(Gravity.CENTER);next.setContentDescription(statisticsMode==StatisticsPeriod.MONTH?"다음 달":"다음 연도");next.setOnClickListener(v->moveStatistics(1));header.addView(next,new LinearLayout.LayoutParams(dp(36),dp(36)));}
-        }else if(tab==4 || tab==5 || tab==6 || tab==3){
+        }else if(tab==4 || tab==5 || tab==6 || tab==3 || tab==1){
             header.setPadding(dp(15),dp(10),dp(15),dp(8));
             TextView back=text(tab==6?"‹":"☰",26,INK,false);back.setGravity(Gravity.CENTER);back.setContentDescription(tab==6?"설정 뒤로":"메뉴 열기");back.setOnClickListener(v->{if(tab==6){tab=settingsReturnTab;render();}else showMenu();});header.addView(back,new LinearLayout.LayoutParams(dp(36),dp(42)));
-            String caption=tab==4?"결산":tab==5?LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy년 M월 d일 EEEE",Locale.KOREA)):tab==6?"설정":"엑셀 백업·가져오기";
+            if(tab==4)header.addView(new View(this),new LinearLayout.LayoutParams(dp(51),1));
+            String caption=tab==1?(recordsAll?"전체 내역":month.format(DateTimeFormatter.ofPattern("yyyy년 M월"))+" 내역"):tab==4?"결산":tab==5?LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy년 M월 d일 EEEE",Locale.KOREA)):tab==6?"설정":"엑셀 백업·가져오기";
             TextView title=text(caption,tab==5?16:20,INK,true);title.setSingleLine(true);title.setGravity(Gravity.CENTER);title.setAutoSizeTextTypeUniformWithConfiguration(11,tab==5?16:20,1,TypedValueCompat.SP);header.addView(title,new LinearLayout.LayoutParams(0,dp(42),1));
             if(tab!=6)header.addView(settingsShortcut(),new LinearLayout.LayoutParams(dp(36),dp(42)));
         }else{
@@ -157,15 +165,17 @@ public final class MainActivity extends Activity {
         root.addView(header);
         FrameLayout body=new FrameLayout(this); root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         bodyContent=column();body.addView(bodyContent,new FrameLayout.LayoutParams(-1,-1));
+        if(tab==1)((FrameLayout.LayoutParams)bodyContent.getLayoutParams()).rightMargin=dp(74);
         if(tab==0)bodyContent.setPadding(0,0,0,dp(80));
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); bodyContent.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         pageScroll=scroll;
-        page=tab==0?new MonthSwipeLayout(this,delta->moveMonth(delta)):column(); page.setPadding(dp(stats?16:20),dp(stats?0:6),dp(stats?16:20),dp(32)); scroll.addView(page);
-        if(tab==0 || tab==1)monthBar();if(tab==1)summary();
+        page=tab==0?new MonthSwipeLayout(this,delta->moveMonth(delta)):column(); page.setPadding(dp(stats||tab==1?16:20),dp(stats?0:6),dp(tab==1?4:stats?16:20),dp(32)); scroll.addView(page);
+        if(tab==0)monthBar();
         if(tab==0) calendar(); else if(tab==1) records(); else if(tab==2) statistics(); else if(tab==3)files();else if(tab==4)settlements();else if(tab==5)home();else settings();
         TextView add=text("+",stats?24:26,stats?PINK:Color.WHITE,false); add.setGravity(Gravity.CENTER); add.setContentDescription("수입, 지출, 저축 기록 추가"); add.setBackground(bg(stats?(preferences.dark()?SUBTLE:0xFFFDECF2):GREEN,14));
-        LinearLayout.LayoutParams addParams=new LinearLayout.LayoutParams(dp(stats?32:42),dp(stats?32:42)); addParams.leftMargin=dp(9); if(tab==1 || tab==2 || tab==4) header.addView(add,addParams);add.setOnClickListener(v->edit(null));
+        LinearLayout.LayoutParams addParams=new LinearLayout.LayoutParams(dp(stats?32:42),dp(stats?32:42)); addParams.leftMargin=dp(9); if(tab==2 || tab==4) header.addView(add,addParams);add.setOnClickListener(v->edit(null));
         if(tab==0||tab==5){add.setBackground(bg(preferences.dark()?INK:GREEN,30));add.setTextColor(preferences.dark()?BG:Color.WHITE);FrameLayout.LayoutParams fp=new FrameLayout.LayoutParams(dp(58),dp(58),Gravity.BOTTOM|Gravity.END);fp.setMargins(0,0,dp(22),dp(20));body.addView(add,fp);}
+        if(tab==1)historyActions(body);
         if(tab==6)return;
         line(root);
         LinearLayout nav=row(); nav.setPadding(dp(4),dp(8),dp(4),dp(8)); nav.setBackgroundColor(preferences.dark()?BG:SURFACE);
@@ -174,24 +184,24 @@ public final class MainActivity extends Activity {
             final int target=targets[i];boolean active=tab==target;int tint=active?(target==2?PINK:GREEN):MUTED;LinearLayout item=column(); item.setGravity(Gravity.CENTER); item.setPadding(0,dp(3),0,dp(3));
             item.addView(new IconView(icons[i],tint),new LinearLayout.LayoutParams(dp(23),dp(23))); space(item,5);
             TextView navLabel=text(names[i],11,tint,active); navLabel.setGravity(Gravity.CENTER); item.addView(navLabel); item.setContentDescription(names[i]+" 탭");item.setSelected(active);
-            item.setOnClickListener(v->{hideKeyboard(); tab=target; displayLimit=100; render();}); nav.addView(item,new LinearLayout.LayoutParams(0,dp(51),1));
+            item.setOnClickListener(v->navigate(target)); nav.addView(item,new LinearLayout.LayoutParams(0,dp(51),1));
         }
         root.addView(nav);
     }
     private View settingsShortcut(){IconView icon=new IconView("settings",INK);icon.setPadding(dp(5),dp(5),dp(5),dp(5));icon.setContentDescription("설정 열기");icon.setOnClickListener(v->navigate(6));return icon;}
-    private void navigate(int target){hideKeyboard();if(target==6)settingsReturnTab=tab;tab=target;displayLimit=100;render();}
+    private void navigate(int target){hideKeyboard();if(target==6)settingsReturnTab=tab;if(target==1)recordsAll=true;tab=target;displayLimit=100;render();}
     private void showMenu(){String[] names={"결산","원형 통계","홈","달력","내역","엑셀 백업·가져오기","설정"};int[] targets={4,2,5,0,1,3,6};new AlertDialog.Builder(this).setTitle("메뉴").setItems(names,(d,i)->navigate(targets[i])).setNegativeButton("닫기",null).show();}
     private void settlements(){
         LinearLayout controls=column();controls.setPadding(dp(18),0,dp(18),dp(12));LinearLayout tabs=row();
         String[] names={"연간 결산","종합 결산","기간 결산"};
-        for(int i=0;i<3;i++){final int mode=i;LinearLayout item=column();item.setGravity(Gravity.CENTER);space(item,10);item.addView(text(names[i],15,settlementMode==i?INK:MUTED,true));space(item,12);View bar=new View(this);bar.setBackgroundColor(settlementMode==i?BLUE:Color.TRANSPARENT);item.addView(bar,new LinearLayout.LayoutParams(dp(58),dp(3)));item.setContentDescription(names[i]);item.setSelected(settlementMode==i);item.setOnClickListener(v->{settlementMode=mode;displayLimit=100;render();});tabs.addView(item,new LinearLayout.LayoutParams(0,dp(49),1));}
+        for(int i=0;i<3;i++){final int mode=i;LinearLayout item=column();item.setGravity(Gravity.CENTER);space(item,10);TextView name=text(names[i],15,settlementMode==i?INK:MUTED,true);name.setGravity(Gravity.CENTER);name.setSingleLine(true);name.setAutoSizeTextTypeUniformWithConfiguration(11,15,1,TypedValueCompat.SP);item.addView(name,new LinearLayout.LayoutParams(-1,-2));space(item,12);View bar=new View(this);bar.setBackgroundColor(settlementMode==i?BLUE:Color.TRANSPARENT);item.addView(bar,new LinearLayout.LayoutParams(dp(58),dp(3)));item.setContentDescription(names[i]);item.setSelected(settlementMode==i);item.setOnClickListener(v->{settlementMode=mode;displayLimit=100;render();});tabs.addView(item,new LinearLayout.LayoutParams(0,dp(49),1));}
         controls.addView(tabs);
         if(settlementMode==0){LinearLayout years=row();TextView prev=button("‹",INK,false,()->{if(settlementYear>1900){settlementYear--;render();}});prev.setContentDescription("이전 해");years.addView(prev,new LinearLayout.LayoutParams(dp(48),dp(46)));TextView year=text(settlementYear+"년",19,INK,true);year.setGravity(Gravity.CENTER);year.setContentDescription("결산 연도 선택");year.setOnClickListener(v->pickSettlementYear());years.addView(year,new LinearLayout.LayoutParams(0,dp(48),1));TextView next=button("›",INK,false,()->{if(settlementYear<9999){settlementYear++;render();}});next.setContentDescription("다음 해");years.addView(next,new LinearLayout.LayoutParams(dp(48),dp(46)));space(controls,10);controls.addView(years);}
         if(settlementMode==2){TextView range=text(periodFrom.format(DateTimeFormatter.ofPattern("yyyy년 MM월"))+" ~ "+periodTo.format(DateTimeFormatter.ofPattern("yyyy년 MM월")),16,INK,true);range.setGravity(Gravity.CENTER);range.setContentDescription("결산 기간 선택");range.setOnClickListener(v->pickSettlementPeriod());controls.addView(range,new LinearLayout.LayoutParams(-1,dp(55)));}
         bodyContent.addView(controls,0);
         YearMonth from=settlementMode==0?YearMonth.of(settlementYear,1):settlementMode==2?periodFrom:null,to=settlementMode==0?YearMonth.of(settlementYear,12):settlementMode==2?periodTo:null;
         OverviewData.Settlement data=OverviewData.settle(all,from,to);
-        for(int i=0;i<Math.min(displayLimit,data.months.size());i++){OverviewData.MonthTotal m=data.months.get(i);String prefix=m.month.format(DateTimeFormatter.ofPattern("yyyy년 MM월"));LinearLayout block=column();block.setPadding(0,dp(16),0,dp(16));valueRow(block,prefix+" 합계",m.balance(),INK,16,true,0);valueRow(block,prefix+" 수입",m.totals[0],BLUE,13,false,14);valueRow(block,prefix+" 지출",-m.totals[1],PINK,13,false,14);valueRow(block,prefix+" 저축",-m.totals[2],PURPLE,13,false,14);block.setContentDescription(prefix+" 월 내역 열기");block.setOnClickListener(v->{month=m.month;tab=1;filter=0;search="";render();});page.addView(block);}
+        for(int i=0;i<Math.min(displayLimit,data.months.size());i++){OverviewData.MonthTotal m=data.months.get(i);String prefix=m.month.format(DateTimeFormatter.ofPattern("yyyy년 MM월"));LinearLayout block=column();block.setPadding(0,dp(16),0,dp(16));valueRow(block,prefix+" 합계",m.balance(),INK,16,true,0);valueRow(block,prefix+" 수입",m.totals[0],BLUE,13,false,14);valueRow(block,prefix+" 지출",-m.totals[1],PINK,13,false,14);valueRow(block,prefix+" 저축",-m.totals[2],PURPLE,13,false,14);block.setContentDescription(prefix+" 월 내역 열기");block.setOnClickListener(v->{month=m.month;tab=1;recordsAll=false;filter=0;search="";recordCategories.clear();recordSort=HistoryData.DATE;render();});page.addView(block);}
         if(data.months.isEmpty())empty(page,"해당 기간의 기록이 없어요","수입·지출·저축을 입력하면 월별 결산을 볼 수 있어요.");
         if(data.months.size()>displayLimit)page.addView(button("이전 100개월 더 보기",BLUE,false,()->{displayLimit+=100;render();}));
         LinearLayout footer=column();footer.setBackgroundColor(preferences.dark()?BG:SURFACE);line(footer);LinearLayout content=column();content.setPadding(dp(20),dp(14),dp(20),dp(16));content.addView(label("기준일 : 1일",12,MUTED));space(content,8);valueRow(content,"총 합계",data.balance(),INK,18,true,0);space(content,5);content.addView(label("수입 − 지출 − 저축",11,MUTED));footer.addView(content);bodyContent.addView(footer);
@@ -214,7 +224,7 @@ public final class MainActivity extends Activity {
         if(preferences.hasPin())settingItem("비밀번호 변경","현재 비밀번호 확인 후 새 비밀번호를 저장해요.",()->verifyPinDialog("현재 비밀번호 확인",this::setupPin));
         settingItem("엑셀 백업·가져오기","전체 기록을 백업하거나 여러 내역을 한 번에 추가해요.",()->navigate(3));
         settingItem("의견 공유","의견을 적고 원하는 앱으로 직접 공유할 수 있어요.",this::shareFeedback);
-        LinearLayout version=card(page);version.addView(text("버전 정보",16,INK,true));space(version,10);version.addView(label("차곡가계부 0.4.0",13,MUTED));space(version,8);version.addView(label("나눔고딕·나눔명조 © NAVER · SIL Open Font License 1.1",10,MUTED));
+        LinearLayout version=card(page);version.addView(text("버전 정보",16,INK,true));space(version,10);version.addView(label("차곡가계부 0.5.0",13,MUTED));space(version,8);version.addView(label("나눔고딕·나눔명조 © NAVER · SIL Open Font License 1.1",10,MUTED));
     }
     private void chooseStartScreen(){String[] labels={"결산 화면","차트 화면","홈 화면","달력 화면","리스트 화면"};int[] ids={4,2,5,0,1};int current=1;for(int i=0;i<ids.length;i++)if(ids[i]==preferences.startTab())current=i;final int[] draft={current};new AlertDialog.Builder(this).setTitle("시작 화면 설정").setSingleChoiceItems(labels,current,(d,i)->draft[0]=i).setNegativeButton("취소",null).setPositiveButton("확인",(d,w)->{preferences.startTab(ids[draft[0]]);toast("다음에 앱을 열 때 적용돼요.");}).show();}
     private void customizeHome(){
@@ -224,7 +234,7 @@ public final class MainActivity extends Activity {
     private void chooseFont(){
         String[] ids={"system","gothic","serif"},names={"내 휴대폰 폰트","나눔고딕","나눔명조"};final String[] chosen={preferences.fontId()};LinearLayout form=column();form.setPadding(dp(20),dp(10),dp(20),dp(10));RadioGroup radios=new RadioGroup(this);for(int i=0;i<ids.length;i++){RadioButton b=new RadioButton(this);b.setId(100+i);b.setText(names[i]);b.setTextColor(INK);b.setTypeface(preferences.typeface(ids[i]));radios.addView(b,new RadioGroup.LayoutParams(-1,dp(48)));if(ids[i].equals(chosen[0]))radios.check(b.getId());}form.addView(radios);space(form,15);form.addView(label("선택한 폰트 미리보기",14,INK));space(form,10);EditText preview=new EditText(this);preview.setText("차곡차곡 모으는 나의 가계부\n수입 3,000,000원 · 저축 500,000원");preview.setTextColor(INK);preview.setTextSize(17);preview.setTypeface(preferences.typeface(chosen[0]));preview.setBackground(bg(INPUT,10));preview.setPadding(dp(12),dp(12),dp(12),dp(12));preview.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);preview.setTypeface(preferences.typeface(chosen[0]));form.addView(preview,new LinearLayout.LayoutParams(-1,dp(130)));radios.setOnCheckedChangeListener((g,id)->{chosen[0]=ids[id-100];preview.setTypeface(preferences.typeface(chosen[0]));});ScrollView scroll=new ScrollView(this);scroll.addView(form);new AlertDialog.Builder(this).setTitle("폰트 변경").setView(scroll).setNegativeButton("취소",null).setPositiveButton("저장",(d,w)->{preferences.fontId(chosen[0]);appFont=preferences.font();hideKeyboard();render();}).show();
     }
-    private void shareFeedback(){LinearLayout form=column();form.setPadding(dp(20),dp(10),dp(20),dp(8));EditText opinion=field(form,"의견","",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);new AlertDialog.Builder(this).setTitle("의견 공유").setView(form).setNegativeButton("취소",null).setPositiveButton("공유",(d,w)->{Intent send=new Intent(Intent.ACTION_SEND);send.setType("text/plain");send.putExtra(Intent.EXTRA_TEXT,"차곡가계부 0.4.0 의견\n"+opinion.getText());startActivity(Intent.createChooser(send,"공유할 앱 선택"));}).show();}
+    private void shareFeedback(){LinearLayout form=column();form.setPadding(dp(20),dp(10),dp(20),dp(8));EditText opinion=field(form,"의견","",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);new AlertDialog.Builder(this).setTitle("의견 공유").setView(form).setNegativeButton("취소",null).setPositiveButton("공유",(d,w)->{Intent send=new Intent(Intent.ACTION_SEND);send.setType("text/plain");send.putExtra(Intent.EXTRA_TEXT,"차곡가계부 0.5.0 의견\n"+opinion.getText());startActivity(Intent.createChooser(send,"공유할 앱 선택"));}).show();}
     private EditText pinField(LinearLayout form,String title){EditText pin=field(form,title,"",android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);pin.setSingleLine(true);pin.setFilters(new InputFilter[]{new InputFilter.LengthFilter(12)});pin.setHint("숫자 4~12자리");return pin;}
     private void setupPin(){
         LinearLayout form=column();form.setPadding(dp(22),dp(12),dp(22),dp(8));EditText first=pinField(form,"새 비밀번호"),second=pinField(form,"비밀번호 확인");form.addView(label("비밀번호를 잊으면 복구할 수 없어요. 따로 기억해 주세요.",12,MUTED));AlertDialog d=new AlertDialog.Builder(this).setTitle("비밀번호 설정").setView(form).setNegativeButton("취소",null).setPositiveButton("저장",null).create();d.setOnShowListener(x->d.getButton(-1).setOnClickListener(v->{String pin=first.getText().toString();if(!pin.matches("[0-9]{4,12}")){first.setError("숫자 4~12자리로 입력하세요.");return;}if(!pin.equals(second.getText().toString())){second.setError("비밀번호가 일치하지 않아요.");return;}d.getButton(-1).setEnabled(false);io.execute(()->{String hash=PinCrypto.create(pin);runOnUiThread(()->{if(isFinishing()||isDestroyed())return;preferences.setPinHash(hash);unlocked=!stopped;applyAppearance();d.dismiss();render();});});}));d.show();
@@ -246,9 +256,10 @@ public final class MainActivity extends Activity {
         TextView next=text("›",32,MUTED,false); next.setGravity(Gravity.CENTER); next.setContentDescription("다음 달"); next.setOnClickListener(v->moveMonth(1)); r.addView(next,new LinearLayout.LayoutParams(dp(42),dp(46))); page.addView(r);
     }
     private void moveMonth(int delta) { if((month.getYear()==1900 && month.getMonthValue()==1 && delta<0) || (month.getYear()==9999 && month.getMonthValue()==12 && delta>0)) return; month=month.plusMonths(delta); selected=month.atDay(1); displayLimit=100;if(tab==2)saveStatisticsPeriod(); render(); }
-    private void pickMonth() {
+    private void pickMonth(){pickMonth(null);}
+    private void pickMonth(Runnable confirmed) {
         LinearLayout form=row();form.setPadding(dp(24),dp(12),dp(24),dp(12));NumberPicker year=numberPicker(1900,9999,month.getYear(),"이동 연도"),value=numberPicker(1,12,month.getMonthValue(),"이동 월");form.addView(year,new LinearLayout.LayoutParams(0,dp(175),1));form.addView(value,new LinearLayout.LayoutParams(0,dp(175),1));
-        new AlertDialog.Builder(this).setTitle("연·월 선택").setView(form).setNegativeButton("취소",null).setPositiveButton("확인",(d,w)->{year.clearFocus();value.clearFocus();month=YearMonth.of(year.getValue(),value.getValue());selected=month.atDay(1);displayLimit=100;if(tab==2)saveStatisticsPeriod();render();}).show();
+        new AlertDialog.Builder(this).setTitle("연·월 선택").setView(form).setNegativeButton("취소",null).setPositiveButton("확인",(d,w)->{year.clearFocus();value.clearFocus();month=YearMonth.of(year.getValue(),value.getValue());selected=month.atDay(1);displayLimit=100;if(confirmed!=null)confirmed.run();if(tab==2)saveStatisticsPeriod();render();}).show();
     }
     private void localizeDatePicker(DatePickerDialog picker){picker.setButton(DialogInterface.BUTTON_POSITIVE,"확인",picker);picker.setButton(DialogInterface.BUTTON_NEGATIVE,"취소",picker);}
     private StatisticsPeriod statisticsPeriod(){return StatisticsPeriod.of(statisticsMode,month,statisticsYear,statisticsFrom,statisticsTo,LocalDate.now());}
@@ -327,21 +338,36 @@ public final class MainActivity extends Activity {
         space(page,16);summary();
     }
     private void records() {
-        LinearLayout filters=row(); filters.setPadding(0,0,0,dp(14)); String[] names={"전체","지출","수입","저축"};
+        LinearLayout controls=column();controls.setPadding(dp(16),dp(3),dp(4),dp(8));LinearLayout scope=row();
+        TextView allScope=button("전체 기간",recordsAll?GREEN:MUTED,false,()->{recordsAll=true;displayLimit=100;render();});allScope.setContentDescription("전체 기간 내역");allScope.setSelected(recordsAll);allScope.setPadding(dp(4),dp(10),dp(4),dp(10));scope.addView(allScope,new LinearLayout.LayoutParams(0,dp(40),1));TextView monthScope=button(recordsAll?"월 선택":month.format(DateTimeFormatter.ofPattern("yyyy.MM")),recordsAll?MUTED:GREEN,false,()->pickMonth(()->recordsAll=false));monthScope.setContentDescription("내역 월 선택");monthScope.setPadding(dp(4),dp(10),dp(4),dp(10));LinearLayout.LayoutParams sm=new LinearLayout.LayoutParams(0,dp(40),1);sm.leftMargin=dp(7);scope.addView(monthScope,sm);controls.addView(scope);space(controls,8);
+        LinearLayout filters=row();String[] names={"전체","지출","수입","저축"};
         for(int i=0;i<4;i++) {
-            final int f=i; TextView t=text(names[i],13,filter==i?Color.WHITE:MUTED,filter==i); t.setGravity(Gravity.CENTER); t.setPadding(dp(8),dp(11),dp(8),dp(11)); t.setBackground(bg(filter==i?GREEN:SURFACE,12)); t.setOnClickListener(v->{filter=f; displayLimit=100; render();});
-            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(42),1); if(i>0) lp.leftMargin=dp(7); filters.addView(t,lp);
-        } page.addView(filters);
-        EditText query=new EditText(this); query.setTypeface(appFont); query.setSingleLine(true); query.setTextSize(14); query.setTextColor(INK); query.setHintTextColor(MUTED); query.setHint("분류 또는 메모 검색"); query.setPadding(dp(15),0,dp(15),0); query.setBackground(bg(SURFACE,12)); query.setText(search); page.addView(query,new LinearLayout.LayoutParams(-1,dp(48))); space(page,18);
-        recordList=column(); page.addView(recordList); refreshRecords();
-        query.addTextChangedListener(new TextWatcher() { public void beforeTextChanged(CharSequence s,int st,int count,int after){} public void onTextChanged(CharSequence s,int st,int before,int count){search=s.toString();displayLimit=100;refreshRecords();} public void afterTextChanged(Editable e){} });
+            final int f=i; TextView t=text(names[i],12,filter==i?Color.WHITE:MUTED,filter==i); t.setGravity(Gravity.CENTER);t.setContentDescription(names[i]+" 내역 필터");t.setSelected(filter==i); t.setPadding(dp(3),dp(10),dp(3),dp(10)); t.setBackground(bg(filter==i?GREEN:SURFACE,10)); t.setOnClickListener(v->{filter=f; displayLimit=100; render();});
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(38),1); if(i>0) lp.leftMargin=dp(5); filters.addView(t,lp);
+        } controls.addView(filters);
+        if(!search.isEmpty()){space(controls,8);TextView query=label("메모: "+search+"  ×",12,GREEN);query.setMaxLines(2);query.setEllipsize(TextUtils.TruncateAt.END);query.setContentDescription("메모 검색 해제");query.setOnClickListener(v->{search="";displayLimit=100;render();});controls.addView(query);}
+        if(!recordCategories.isEmpty()||recordSort==HistoryData.CATEGORY){space(controls,7);TextView category=label((recordCategories.isEmpty()?"모든 카테고리":recordCategories.size()+"개 카테고리 선택")+" · "+(recordSort==HistoryData.CATEGORY?"카테고리순":"날짜순"),11,MUTED);category.setContentDescription("카테고리 선택 상태");category.setOnClickListener(v->chooseRecordCategories());controls.addView(category);}
+        bodyContent.addView(controls,0);recordList=column();page.addView(recordList);recordFooter=column();bodyContent.addView(recordFooter);refreshRecords();
     }
     private void refreshRecords() {
-        recordList.removeAllViews(); List<Ledger.Entry> entries=new ArrayList<>(); String[] types={"","지출","수입","저축"}; String q=search.trim().toLowerCase(Locale.KOREA);
-        for(Ledger.Entry e:monthly) if((filter==0 || e.type.equals(types[filter])) && (q.isEmpty() || (e.category+" "+e.memo).toLowerCase(Locale.KOREA).contains(q))) entries.add(e);
-        TextView count=label(entries.size()+"건의 내역",12,MUTED); recordList.addView(count); space(recordList,12);
-        if(entries.isEmpty()) empty(recordList,"내역이 없어요",search.isEmpty()?"+ 버튼으로 첫 기록을 남겨 보세요.":"다른 검색어로 찾아보세요.");
-        else showEntries(recordList,entries,true);
+        recordList.removeAllViews();String[] types={"","지출","수입","저축"};HistoryData.Result data=HistoryData.build(all,recordsAll?null:month,types[filter],search,recordCategories,recordSort);
+        recordList.addView(label(data.entries.size()+"건 · "+(recordSort==HistoryData.CATEGORY?"카테고리순":"최신 날짜순"),11,MUTED));space(recordList,12);int shown=0;String previousCategory=null;
+        if(data.entries.isEmpty())empty(recordList,"내역이 없어요",search.isEmpty()&&recordCategories.isEmpty()?"+ 버튼으로 첫 기록을 남겨 보세요.":"검색어나 선택 카테고리를 확인하세요.");
+        for(HistoryData.Month group:data.months){if(shown>=displayLimit)break;if(recordSort==HistoryData.CATEGORY&&!group.category.equals(previousCategory)){space(recordList,8);TextView title=text(group.category,17,GREEN,true);title.setContentDescription("카테고리 그룹 "+group.category);recordList.addView(title);space(recordList,10);previousCategory=group.category;}
+            int monthShown=0;for(HistoryData.Day day:group.days){if(shown>=displayLimit)break;historyDateHeader(day.date);int count=0;for(Ledger.Entry entry:day.entries){if(shown>=displayLimit)break;historyEntry(entry);shown++;monthShown++;count++;}space(recordList,10);historyTotal(recordList,"일일 합계"+(count<day.entries.size()?" · 전체 "+day.entries.size()+"건":""),Ledger.available(day.totals),false);space(recordList,16);}
+            historyTotal(recordList,group.month.format(DateTimeFormatter.ofPattern("yyyy년 M월"))+" 합계",Ledger.available(group.totals),true);if(monthShown<group.count){recordList.addView(label("이 달 전체 "+group.count+"건의 합계 · 더 보기로 이어집니다.",10,MUTED));}space(recordList,24);
+        }
+        if(shown<data.entries.size())recordList.addView(button("내역 100건 더 보기",GREEN,false,()->{int position=pageScroll.getScrollY();displayLimit+=100;refreshRecords();pageScroll.post(()->pageScroll.scrollTo(0,position));}));
+        recordFooter.removeAllViews();line(recordFooter);LinearLayout footer=column();footer.setPadding(dp(16),dp(10),dp(4),dp(12));boolean filtered=filter!=0||!search.isEmpty()||!recordCategories.isEmpty();historyTotal(footer,filtered?"결과 합계":recordsAll?"전체 합계":"선택 월 합계",Ledger.available(data.totals),true);space(footer,4);footer.addView(label("수입 − 지출 − 저축 · "+data.entries.size()+"건",10,MUTED));recordFooter.addView(footer);
+    }
+    private void historyTotal(LinearLayout parent,String caption,long amount,boolean bold){LinearLayout r=row();r.setPadding(0,dp(4),0,dp(4));TextView name=text(caption,bold?13:12,INK,bold);name.setMaxLines(2);r.addView(name,new LinearLayout.LayoutParams(0,-2,1));TextView value=text(won(amount),bold?15:13,INK,true);value.setSingleLine(true);value.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);value.setAutoSizeTextTypeUniformWithConfiguration(9,bold?15:13,1,TypedValueCompat.SP);r.addView(value,new LinearLayout.LayoutParams(dp(118),dp(24)));r.setContentDescription(caption+" "+won(amount));parent.addView(r);}
+    private void historyDateHeader(String date){LinearLayout heading=row();for(int i=0;i<3;i++){if(i==1){TextView label=text(LocalDate.parse(date).format(DateTimeFormatter.ofPattern("yyyy년 MM월 dd일 EEEE",Locale.KOREA)),12,MUTED,true);label.setGravity(Gravity.CENTER);label.setSingleLine(true);label.setAutoSizeTextTypeUniformWithConfiguration(9,12,1,TypedValueCompat.SP);heading.addView(label,new LinearLayout.LayoutParams(dp(192),dp(29)));}else{View line=new View(this);line.setBackgroundColor(LINE);heading.addView(line,new LinearLayout.LayoutParams(0,dp(1),1));}}recordList.addView(heading);space(recordList,7);}
+    private void historyEntry(Ledger.Entry entry){LinearLayout r=row();r.setPadding(0,dp(8),0,dp(8));int kind=Ledger.index(entry.type);TextView type=text(entry.type,12,COLORS[kind],true);r.addView(type,new LinearLayout.LayoutParams(dp(31),-2));TextView price=text((kind==0?"+":"−")+won(entry.amount),13,COLORS[kind],true);price.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);price.setSingleLine(true);price.setAutoSizeTextTypeUniformWithConfiguration(9,13,1,TypedValueCompat.SP);r.addView(price,new LinearLayout.LayoutParams(dp(106),dp(27)));LinearLayout description=column();TextView memo=text(entry.memo.isEmpty()?entry.category:entry.memo,13,INK,true);memo.setMaxLines(3);memo.setEllipsize(TextUtils.TruncateAt.END);description.addView(memo);if(!entry.memo.isEmpty()){space(description,4);description.addView(label(entry.category,10,MUTED));}LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-2,1);p.leftMargin=dp(8);r.addView(description,p);r.setContentDescription(entry.date+" "+entry.type+" "+entry.category+" "+won(entry.amount)+". 눌러서 수정");r.setOnClickListener(v->edit(entry));recordList.addView(r);}
+    private void historyActions(FrameLayout parent){LinearLayout rail=column();rail.setGravity(Gravity.CENTER_HORIZONTAL);String[] descriptions={"메모 검색","카테고리 정렬","수입, 지출, 저축 기록 추가"};for(int i=0;i<3;i++){final int action=i;FrameLayout circle=new FrameLayout(this);circle.setBackground(bg(preferences.dark()?INK:SURFACE,30));circle.setContentDescription(descriptions[i]);circle.setElevation(dp(3));View icon;if(i==0){icon=new IconView("search",preferences.dark()?BG:INK);}else{TextView label=text(i==1?"A–Z":"+",i==1?17:29,preferences.dark()?BG:INK,true);label.setGravity(Gravity.CENTER);icon=label;}FrameLayout.LayoutParams ip=new FrameLayout.LayoutParams(dp(30),dp(30),Gravity.CENTER);circle.addView(icon,ip);circle.setOnClickListener(v->{if(action==0)searchRecords();else if(action==1)chooseRecordCategories();else edit(null);});rail.addView(circle,new LinearLayout.LayoutParams(dp(52),dp(52)));if(i<2)space(rail,12);}FrameLayout.LayoutParams rp=new FrameLayout.LayoutParams(dp(68),-2,Gravity.BOTTOM|Gravity.END);rp.setMargins(0,0,dp(5),dp(20));parent.addView(rail,rp);}
+    private void searchRecords(){LinearLayout form=column();form.setPadding(dp(22),dp(10),dp(22),dp(8));EditText query=field(form,"메모 검색",search,android.text.InputType.TYPE_CLASS_TEXT);query.setSingleLine(true);query.setHint("예: 점심, 월세");query.setContentDescription("메모 검색어");query.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});form.addView(label("현재 기간·구분·카테고리 안에서 메모를 찾아요.",12,MUTED));new AlertDialog.Builder(this).setTitle("메모로 검색하기").setView(form).setNegativeButton("취소",null).setNeutralButton("검색 해제",(d,w)->{search="";displayLimit=100;render();}).setPositiveButton("검색",(d,w)->{search=query.getText().toString().trim();displayLimit=100;hideKeyboard();render();}).show();}
+    private void chooseRecordCategories(){
+        Set<String> draft=new HashSet<>(recordCategories);final int[] order={HistoryData.CATEGORY};TreeSet<String> options=new TreeSet<>((a,b)->{int result=java.text.Collator.getInstance(Locale.KOREA).compare(a,b);return result!=0?result:a.compareTo(b);});for(String type:Ledger.TYPES)options.addAll(categories.choices(type,all));options.addAll(draft);
+        LinearLayout form=column();form.setPadding(dp(20),dp(8),dp(20),dp(10));form.addView(label("선택하지 않으면 모든 카테고리를 보여줘요.",12,MUTED));RadioGroup modes=new RadioGroup(this);modes.setOrientation(LinearLayout.HORIZONTAL);for(int i=0;i<2;i++){RadioButton mode=new RadioButton(this);mode.setId(300+i);mode.setText(i==0?"날짜순":"카테고리순");mode.setTextColor(INK);mode.setTextSize(13);mode.setTypeface(appFont);modes.addView(mode,new RadioGroup.LayoutParams(0,dp(45),1));}modes.check(301);modes.setOnCheckedChangeListener((g,id)->order[0]=id-300);form.addView(modes);line(form);space(form,8);for(String category:options){CheckBox check=new CheckBox(this);check.setText(category);check.setTextColor(INK);check.setTextSize(14);check.setTypeface(appFont);check.setChecked(draft.contains(category));check.setContentDescription(category+" 카테고리 선택");check.setPadding(0,dp(6),0,dp(6));check.setOnCheckedChangeListener((b,on)->{if(on)draft.add(category);else draft.remove(category);});form.addView(check,new LinearLayout.LayoutParams(-1,-2));}ScrollView scroll=new ScrollView(this);scroll.addView(form);new AlertDialog.Builder(this).setTitle("선택한 카테고리로 정렬").setView(scroll).setNegativeButton("취소",null).setNeutralButton("전체 보기",(d,w)->{recordCategories.clear();recordSort=HistoryData.DATE;preferences.recordSort(recordSort);displayLimit=100;render();}).setPositiveButton("확인",(d,w)->{recordCategories=draft;recordSort=order[0];preferences.recordSort(recordSort);displayLimit=100;render();}).show();
     }
     private void showEntries(LinearLayout parent,List<Ledger.Entry> entries,boolean groupDates) {
         String last="";
@@ -412,12 +438,16 @@ public final class MainActivity extends Activity {
         LinearLayout input=card(page); input.addView(text("엑셀 한 번에 가져오기",18,INK,true)); space(input,8); TextView desc=label("입력 양식에 내역을 적어 가져오세요.\n저장 전에 오류와 중복을 확인할 수 있어요.",13,MUTED); desc.setLineSpacing(dp(5),1); input.addView(desc); space(input,18); input.addView(button("엑셀 파일 가져오기",GREEN,true,this::chooseImport)); space(input,10); input.addView(button("빈 입력 양식 내려받기",GREEN,false,()->chooseExport(TEMPLATE)));
         LinearLayout info=card(page); info.addView(text("알아두세요",14,INK,true)); space(info,12);
         TextView note=label("• .xlsx 파일을 지원해요. 한 번에 최대 10,000건을 가져와요.\n\n• 백업 파일의 고유ID가 같으면 중복을 건너뛰어요. ID가 없으면 날짜·구분·금액·분류·메모를 비교해요.\n\n• 오류나 ID 충돌이 있으면 전체를 추가하지 않아요. 기존 내역은 지우지 않아요.\n\n• 기록은 이 휴대폰에만 저장돼요. 앱을 삭제하면 기록도 삭제되니, 백업 파일을 따로 보관하세요.",12,MUTED); note.setLineSpacing(dp(4),1); info.addView(note);
-        TextView version=label("차곡가계부 0.4.0  ·  로그인 없이, 광고 없이",11,MUTED); version.setGravity(Gravity.CENTER); page.addView(version);
+        TextView version=label("차곡가계부 0.5.0  ·  로그인 없이, 광고 없이",11,MUTED); version.setGravity(Gravity.CENTER); page.addView(version);
     }
     private EditText field(LinearLayout parent,String title,String value,int inputType) {
         parent.addView(text(title,12,MUTED,true)); space(parent,7); EditText edit=new EditText(this); edit.setTextSize(15); edit.setTextColor(INK); edit.setPadding(dp(12),dp(10),dp(12),dp(10)); edit.setBackground(bg(INPUT,10)); edit.setInputType(inputType); edit.setTypeface(appFont); edit.setHintTextColor(MUTED); edit.setText(value); parent.addView(edit,new LinearLayout.LayoutParams(-1,dp(47))); space(parent,15); return edit;
     }
-    private LocalDate newRecordDate(){if(tab==0)return selected;LocalDate today=LocalDate.now();if(tab==2){StatisticsPeriod period=statisticsPeriod();return period.contains(today)?today:period.from;}if(tab==4||tab==5)return today;return YearMonth.from(today).equals(month)?today:month.atDay(1);}
+    private LocalDate newRecordDate(){if(tab==0)return selected;LocalDate today=LocalDate.now();if(tab==2){StatisticsPeriod period=statisticsPeriod();return period.contains(today)?today:period.from;}if(tab==4||tab==5||(tab==1&&recordsAll))return today;return YearMonth.from(today).equals(month)?today:month.atDay(1);}
+    private void amountKeypad(EditText target,String date,String type){
+        ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(target.getWindowToken(),0);AmountKeypad draft=new AmountKeypad(target.getText().toString());LinearLayout form=column();form.setPadding(dp(20),dp(5),dp(20),dp(10));TextView when=label(date+" · "+type,13,MUTED);when.setGravity(Gravity.CENTER);form.addView(when);space(form,14);TextView amount=text("",30,COLORS[Ledger.index(type)],true);amount.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);amount.setSingleLine(true);amount.setAutoSizeTextTypeUniformWithConfiguration(17,30,1,TypedValueCompat.SP);amount.setContentDescription("키패드 금액");form.addView(amount,new LinearLayout.LayoutParams(-1,dp(47)));TextView error=label("",11,RED);form.addView(error);TextView clear=label("전체 지우기",12,MUTED);clear.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);clear.setMinHeight(dp(35));form.addView(clear,new LinearLayout.LayoutParams(-1,dp(35)));Runnable refresh=()->{amount.setText(number.format(draft.value())+" 원");error.setText("");};clear.setOnClickListener(v->{draft.clear();refresh.run();});
+        String[] keys={"1","2","3","4","5","6","7","8","9","0","00","⌫"};for(int r=0;r<4;r++){LinearLayout line=row();for(int c=0;c<3;c++){String key=keys[r*3+c];FrameLayout slot=new FrameLayout(this);TextView digit=text(key,22,INK,true);digit.setGravity(Gravity.CENTER);GradientDrawable circle=bg(INPUT,40);circle.setStroke(dp(1),LINE);digit.setBackground(circle);digit.setContentDescription("⌫".equals(key)?"키패드 한 자리 지우기":"키패드 "+key);digit.setOnClickListener(v->{if(draft.press(key))refresh.run();else error.setText("금액은 최대 12자리까지 입력할 수 있어요.");});if("⌫".equals(key))digit.setOnLongClickListener(v->{draft.clear();refresh.run();return true;});slot.addView(digit,new FrameLayout.LayoutParams(dp(62),dp(62),Gravity.CENTER));line.addView(slot,new LinearLayout.LayoutParams(0,dp(73),1));}form.addView(line);}refresh.run();ScrollView scroll=new ScrollView(this);scroll.addView(form);AlertDialog dialog=new AlertDialog.Builder(this).setTitle(type+" 금액 입력").setView(scroll).setNegativeButton("취소",null).setPositiveButton("적용",null).create();dialog.setOnShowListener(d->dialog.getButton(-1).setOnClickListener(v->{try{Ledger.parseAmount(draft.digits());target.setText(draft.digits());target.setSelection(target.length());dialog.dismiss();}catch(Exception ex){error.setText("금액은 1원 이상 입력하세요.");}}));dialog.show();
+    }
     private void edit(Ledger.Entry entry) {
         if(busy) return;
         boolean updating=entry!=null;
@@ -429,6 +459,7 @@ public final class MainActivity extends Activity {
         EditText amount=field(form,"금액 (원)",updating?String.valueOf(entry.amount):"",android.text.InputType.TYPE_CLASS_NUMBER); amount.setHint("0"); amount.setTextSize(24); amount.setFilters(new InputFilter[]{new InputFilter.LengthFilter(12)});
         LocalDate defaultDate=updating?LocalDate.parse(entry.date):newRecordDate();
         EditText date=field(form,"날짜",defaultDate.toString(),android.text.InputType.TYPE_CLASS_TEXT); date.setFocusable(false); date.setContentDescription("날짜 선택");
+        amount.setShowSoftInputOnFocus(false);amount.setContentDescription("금액 입력 · 숫자 키패드 열기");amount.setOnClickListener(v->amountKeypad(amount,date.getText().toString(),chosen[0]));
         date.setOnClickListener(v->{LocalDate d=LocalDate.parse(date.getText().toString()); DatePickerDialog picker=new DatePickerDialog(this,(p,y,m,day)->date.setText(LocalDate.of(y,m+1,day).toString()),d.getYear(),d.getMonthValue()-1,d.getDayOfMonth());localizeDatePicker(picker);picker.show();});
         EditText category=field(form,"분류",updating?entry.category:"",android.text.InputType.TYPE_CLASS_TEXT); category.setHint("예: 식비, 월급, 적금"); category.setSingleLine(true); category.setFilters(new InputFilter[]{new InputFilter.LengthFilter(40)});
         LinearLayout categoryActions=row();
@@ -564,6 +595,7 @@ public final class MainActivity extends Activity {
             else if(kind.equals("home")){Path roof=new Path();roof.moveTo(2,11);roof.lineTo(12,2);roof.lineTo(22,11);raw.drawPath(roof,p);raw.drawRect(5,10,19,22,p);raw.drawRect(10,15,14,22,p);}
             else if(kind.equals("summary")){p.setStyle(Paint.Style.FILL);raw.drawRect(3,12,7,22,p);raw.drawRect(10,2,14,22,p);raw.drawRect(17,8,21,22,p);}
             else if(kind.equals("settings")){raw.drawCircle(12,12,7,p);raw.drawCircle(12,12,2.8f,p);for(int i=0;i<8;i++){double angle=Math.PI*i/4;raw.drawLine(12+8*(float)Math.cos(angle),12+8*(float)Math.sin(angle),12+10*(float)Math.cos(angle),12+10*(float)Math.sin(angle),p);}}
+            else if(kind.equals("search")){raw.drawCircle(10,10,6,p);raw.drawLine(14.5f,14.5f,21,21,p);}
             else {p.setStyle(Paint.Style.FILL);raw.drawRoundRect(1,3,23,7,1.5f,1.5f,p);raw.drawRoundRect(1,10,19,14,1.5f,1.5f,p);raw.drawRoundRect(1,17,15,21,1.5f,1.5f,p);}
             raw.restore();}
     }

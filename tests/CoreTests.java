@@ -26,6 +26,18 @@ public final class CoreTests {
     }
     private static byte[] zip(Map<String,String> parts)throws Exception {ByteArrayOutputStream out=new ByteArrayOutputStream();try(ZipOutputStream z=new ZipOutputStream(out)){for(Map.Entry<String,String> p:parts.entrySet()){z.putNextEntry(new ZipEntry(p.getKey()));z.write(p.getValue().getBytes(StandardCharsets.UTF_8));z.closeEntry();}}return out.toByteArray();}
     private static XlsxIO.ReadResult read(byte[] bytes)throws Exception{return XlsxIO.read(new ByteArrayInputStream(bytes));}
+    private static void historyChecks()throws Exception{
+        List<Ledger.Entry> entries=Arrays.asList(new Ledger.Entry("a","2025-12-31","수입",1000,"급여","급여 입금",0),new Ledger.Entry("b","2026-01-01","지출",100,"식비","점심 커피",0),new Ledger.Entry("c","2026-01-01","저축",200,"적금","매월 저축",0),new Ledger.Entry("d","2026-02-01","지출",50,"교통","BUS 교통비",0),new Ledger.Entry("e","2026-02-02","지출",70,"식비","",0));
+        HistoryData.Result data=HistoryData.build(entries,null,"","",Collections.emptySet(),0);eq(5,data.entries.size());eq(580L,Ledger.available(data.totals));eq(3,data.months.size());eq(YearMonth.of(2026,2),data.months.get(0).month);eq(-120L,Ledger.available(data.months.get(0).totals));eq(-300L,Ledger.available(data.months.get(1).days.get(0).totals));eq("e",data.entries.get(0).id);
+        data=HistoryData.build(entries,YearMonth.of(2026,1),"","",Collections.emptySet(),0);eq(2,data.entries.size());eq(-300L,Ledger.available(data.totals));
+        data=HistoryData.build(entries,null,"지출","",Collections.emptySet(),0);eq(3,data.entries.size());eq(-220L,Ledger.available(data.totals));
+        data=HistoryData.build(entries,null,"","  bus ",Collections.emptySet(),0);eq(1,data.entries.size());eq("d",data.entries.get(0).id);
+        eq(0,HistoryData.build(entries,null,"","식비",Collections.emptySet(),0).entries.size());eq(0,HistoryData.build(entries,null,"","없는 메모",Collections.emptySet(),0).entries.size());
+        data=HistoryData.build(entries,null,"","",new HashSet<>(Arrays.asList("식비","적금")),1);eq(3,data.entries.size());eq(-370L,Ledger.available(data.totals));eq("식비",data.months.get(0).category);eq("적금",data.months.get(2).category);eq("e",data.entries.get(0).id);
+        eq(1,HistoryData.build(entries,YearMonth.of(2026,1),"지출","커피",Collections.singleton("식비"),1).entries.size());eq(0,HistoryData.build(entries,YearMonth.of(2026,2),"지출","커피",Collections.singleton("식비"),1).entries.size());eq(0,HistoryData.build(Collections.emptyList(),null,"","",Collections.emptySet(),0).months.size());
+        AmountKeypad pad=new AmountKeypad("");eq("0",pad.digits());eq(true,pad.press("00"));eq("0",pad.digits());pad.press("1");pad.press("2");pad.press("00");eq(1200L,pad.value());pad.press("⌫");eq("120",pad.digits());pad.clear();eq("0",pad.digits());eq(false,pad.press("."));pad=new AmountKeypad("999999999999");eq(false,pad.press("0"));eq(999999999999L,pad.value());eq("42",new AmountKeypad("00042").digits());eq("0",new AmountKeypad("wrong").digits());
+        List<Ledger.Entry> many=new ArrayList<>();for(int i=0;i<105;i++)many.add(new Ledger.Entry("many"+i,"2026-01-01","지출",1,"식비","",0));data=HistoryData.build(many,null,"","",Collections.emptySet(),0);eq(105,data.months.get(0).count);eq(-105L,Ledger.available(data.months.get(0).days.get(0).totals));
+    }
     private static void periodChecks()throws Exception{
         LocalDate today=LocalDate.of(2026,10,29);YearMonth month=YearMonth.of(2024,2);
         StatisticsPeriod feb=StatisticsPeriod.of(0,month,2026,today,today,today);eq(LocalDate.of(2024,2,1),feb.from);eq(LocalDate.of(2024,2,29),feb.to);eq(true,feb.contains(LocalDate.of(2024,2,29)));eq(false,feb.contains(LocalDate.of(2024,3,1)));
@@ -45,6 +57,7 @@ public final class CoreTests {
     public static void main(String[] args)throws Exception {
         overviewChecks();
         periodChecks();
+        historyChecks();
         String hash=PinCrypto.create("0842");eq(true,PinCrypto.verify("0842",hash));eq(false,PinCrypto.verify("842",hash));eq(false,PinCrypto.verify("9999",hash));eq(false,PinCrypto.verify("0842","bad"));eq(false,hash.equals(PinCrypto.create("0842")));rejects(()->PinCrypto.create("12"));rejects(()->PinCrypto.create("abcd"));
         eq("2024-02-29",Ledger.normalizeDate("2024/2/29")); eq("2026-10-27",Ledger.normalizeDate("20261027"));
         eq("2026-10-27",Ledger.normalizeDate("2026-10-27T00:00:00.000Z"));
