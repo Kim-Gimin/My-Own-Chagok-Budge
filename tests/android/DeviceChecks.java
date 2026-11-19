@@ -25,7 +25,7 @@ public class DeviceChecks extends Instrumentation {
     void runUpgradeChecks()throws Exception {
         Context ctx=getTargetContext(); LedgerDb db=new LedgerDb(ctx);
         eq(3,db.all().size());eq(1987500L,Ledger.available(Ledger.totals(db.all())));db.close();
-        eq("0.1.1",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
+        eq("0.1.2",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
     }
     void runChecks()throws Exception {
         Context ctx=getTargetContext();ctx.deleteDatabase("chagok.db");LedgerDb db=new LedgerDb(ctx);
@@ -79,7 +79,23 @@ public class DeviceChecks extends Instrumentation {
         eq(true,getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText("추가할 내역이 없어요").size()>0);clickText("확인");
         verify=new LedgerDb(ctx);eq(3,verify.all().size());verify.close();
         categoryUiChecks(app);
+        calendarUiChecks(app);
         runOnMainSync(()->a.finish());waitForIdleSync();
+    }
+    void calendarUiChecks(MainActivity app)throws Exception {
+        runOnMainSync(()->{try{set(app,"tab",0);set(app,"month",YearMonth.of(2026,9));set(app,"selected",LocalDate.of(2026,9,1));invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"2026-09-14 새 기록").performClick());waitForIdleSync();Thread.sleep(200);
+        List<AccessibilityNodeInfo> edits=new ArrayList<>();collectEdits(getUiAutomation().getRootInActiveWindow(),edits);
+        eq(4,edits.size());eq("2026-09-14",edits.get(1).getText().toString());
+        clickText("취소");waitForIdleSync();LedgerDb db=new LedgerDb(getTargetContext());eq(4,db.all().size());db.close();
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"2026-09-30 새 기록").performClick());waitForIdleSync();Thread.sleep(200);
+        edits.clear();collectEdits(getUiAutomation().getRootInActiveWindow(),edits);eq("2026-09-30",edits.get(1).getText().toString());
+        setText(edits.get(0),"7000");setText(edits.get(2),"달력 날짜 테스트");clickText("저축");
+        screenshot(getTargetContext(),"calendar-new-entry");clickText("저장");waitForIdleSync();Thread.sleep(200);
+        db=new LedgerDb(getTargetContext());eq(5,db.all().size());eq(true,db.all().stream().anyMatch(e->e.date.equals("2026-09-30") && e.type.equals("저축") && e.amount==7000));db.close();
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"2026-09-30 새 기록").performClick());waitForIdleSync();Thread.sleep(200);
+        edits.clear();collectEdits(getUiAutomation().getRootInActiveWindow(),edits);eq("2026-09-30",edits.get(1).getText().toString());eq(true,edits.get(0).isShowingHintText());
+        clickText("취소");waitForIdleSync();db=new LedgerDb(getTargetContext());eq(5,db.all().size());db.close();
     }
     void categoryUiChecks(MainActivity app)throws Exception {
         runOnMainSync(()->{try{set(app,"tab",0);invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();

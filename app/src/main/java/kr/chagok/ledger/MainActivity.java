@@ -166,7 +166,7 @@ public final class MainActivity extends Activity {
                 if(t!=null) for(int i=0;i<3;i++) if(t[i]>0) {
                     TextView amount=text((i==0?"+":i==1?"−":"·")+shortMoney(t[i]),9,COLORS[i],false); amount.setSingleLine(true); amount.setGravity(Gravity.CENTER); cell.addView(amount,new LinearLayout.LayoutParams(-1,dp(11)));
                 }
-                cell.setContentDescription(date+" 내역 보기"); cell.setOnClickListener(v->{selected=date; displayLimit=100; render();});
+                cell.setContentDescription(date+" 새 기록"); cell.setOnClickListener(v->{selected=date; displayLimit=100; render(); edit(null);});
             }
             c.addView(week);
         }
@@ -176,7 +176,7 @@ public final class MainActivity extends Activity {
         LinearLayout heading=row(); TextView date=text(selected.format(DateTimeFormatter.ofPattern("M월 d일 EEEE",Locale.KOREA)),17,INK,true); heading.addView(date,new LinearLayout.LayoutParams(0,-2,1));
         List<Ledger.Entry> entries=new ArrayList<>(); for(Ledger.Entry e:monthly) if(e.date.equals(selected.toString())) entries.add(e);
         heading.addView(label(entries.size()+"건",12,MUTED)); page.addView(heading); space(page,12);
-        if(entries.isEmpty()) empty(page,"아직 기록이 없어요","오른쪽 위 + 버튼으로 기록해 보세요.");
+        if(entries.isEmpty()) empty(page,"아직 기록이 없어요","날짜나 오른쪽 위 + 버튼을 눌러 기록해 보세요.");
         else showEntries(page,entries,false);
     }
     private void records() {
@@ -242,7 +242,7 @@ public final class MainActivity extends Activity {
         LinearLayout input=card(page); input.addView(text("엑셀 한 번에 가져오기",18,INK,true)); space(input,8); TextView desc=label("입력 양식에 내역을 적어 가져오세요.\n저장 전에 오류와 중복을 확인할 수 있어요.",13,MUTED); desc.setLineSpacing(dp(5),1); input.addView(desc); space(input,18); input.addView(button("엑셀 파일 가져오기",GREEN,true,this::chooseImport)); space(input,10); input.addView(button("빈 입력 양식 내려받기",GREEN,false,()->chooseExport(TEMPLATE)));
         LinearLayout info=card(page); info.addView(text("알아두세요",14,INK,true)); space(info,12);
         TextView note=label("• .xlsx 파일을 지원해요. 한 번에 최대 10,000건을 가져와요.\n\n• 백업 파일의 고유ID가 같으면 중복을 건너뛰어요. ID가 없으면 날짜·구분·금액·분류·메모를 비교해요.\n\n• 오류나 ID 충돌이 있으면 전체를 추가하지 않아요. 기존 내역은 지우지 않아요.\n\n• 기록은 이 휴대폰에만 저장돼요. 앱을 삭제하면 기록도 삭제되니, 백업 파일을 따로 보관하세요.",12,MUTED); note.setLineSpacing(dp(4),1); info.addView(note);
-        TextView version=label("차곡가계부 0.1.1  ·  로그인 없이, 광고 없이",11,MUTED); version.setGravity(Gravity.CENTER); page.addView(version);
+        TextView version=label("차곡가계부 0.1.2  ·  로그인 없이, 광고 없이",11,MUTED); version.setGravity(Gravity.CENTER); page.addView(version);
     }
     private EditText field(LinearLayout parent,String title,String value,int inputType) {
         parent.addView(text(title,12,MUTED,true)); space(parent,7); EditText edit=new EditText(this); edit.setTextSize(15); edit.setTextColor(INK); edit.setPadding(dp(12),dp(10),dp(12),dp(10)); edit.setBackground(bg(0xFFF3F5F6,10)); edit.setInputType(inputType); edit.setText(value); parent.addView(edit,new LinearLayout.LayoutParams(-1,dp(47))); space(parent,15); return edit;
