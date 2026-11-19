@@ -40,7 +40,7 @@ Gradle 디버그 구성도 루트의 기존 `local-test.keystore`를 참조합�
   -AndroidJar 'C:\Android\platforms\android-36\android.jar' `
   -BuildTools 'C:\Android\build-tools\36.0.0' `
   -Adb 'C:\Android\platform-tools\adb.exe' `
-  -Serial emulator-5584 -Mode full
+  -Serial emulator-5584 -Keystore 'C:\PrivateKeys\chagok-original.keystore' -Mode full
 ```
 
 다른 모드는 `planning`, `planselect`, `categories`, `calendarLiving`, `back`, `assetguard`, `recovery` 등입니다. 과거 버전 전용 baseline/upgrade 모드는 해당 APK와 fixture를 맞춰야 합니다. 키가 필요한 통합 빌드는 로컬 원본 키 설정을 먼저 준비하세요.
