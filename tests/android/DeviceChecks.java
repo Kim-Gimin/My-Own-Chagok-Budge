@@ -19,13 +19,13 @@ public class DeviceChecks extends Instrumentation {
     @Override public void onCreate(Bundle args){super.onCreate(args);mode=args==null?"":args.getString("mode","");start();}
     @Override public void onStart(){
         Bundle out=new Bundle();
-        try{if("upgrade".equals(mode))runUpgradeChecks();else if("preview".equals(mode))statisticsPreview();else if("revision".equals(mode))revisionUiChecks();else if("history".equals(mode))historyUiChecks();else runChecks();out.putString("result","PASS: "+checks+" Android integration checks");finish(Activity.RESULT_OK,out);}
+        try{if("upgrade".equals(mode))runUpgradeChecks();else if("preview".equals(mode))statisticsPreview();else if("revision".equals(mode))revisionUiChecks();else if("history".equals(mode))historyUiChecks();else if("overlay".equals(mode))overlayUiChecks();else runChecks();out.putString("result","PASS: "+checks+" Android integration checks");finish(Activity.RESULT_OK,out);}
         catch(Throwable e){StringWriter sw=new StringWriter();e.printStackTrace(new PrintWriter(sw));out.putString("error",sw.toString());finish(Activity.RESULT_CANCELED,out);}
     }
     void runUpgradeChecks()throws Exception {
         Context ctx=getTargetContext(); LedgerDb db=new LedgerDb(ctx);
         eq(6,db.all().size());eq(1975877L,Ledger.available(Ledger.totals(db.all())));db.close();
-        eq("0.5.0",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
+        eq("0.5.1",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
         eq(true,new CategoryStore(ctx).choices("지출",Collections.emptyList()).contains("반려동물 병원"));
         AppPreferences prefs=new AppPreferences(ctx);eq(5,prefs.startTab());eq("gothic",prefs.fontId());eq(false,prefs.dark());eq(true,prefs.homeMetrics().contains("today_2"));
     }
@@ -88,9 +88,25 @@ public class DeviceChecks extends Instrumentation {
         featureUiChecks(app);
         revisionUiChecks();
         historyUiChecks();
+        overlayUiChecks();
         runOnMainSync(()->a.finish());waitForIdleSync();
     }
     View windowDesc(String desc){List<View> roots=android.view.inspector.WindowInspector.getGlobalWindowViews();for(int i=roots.size()-1;i>=0;i--){View found=findDesc(roots.get(i),desc);if(found!=null)return found;}throw new AssertionError("No view: "+desc);}
+    android.graphics.Rect screenRect(View view){int[] location=new int[2];view.getLocationOnScreen(location);return new android.graphics.Rect(location[0],location[1],location[0]+view.getWidth(),location[1]+view.getHeight());}
+    void swipeScreen(float x,float y,float dx,float dy)throws Exception{long down=SystemClock.uptimeMillis();for(int i=0;i<=13;i++){int action=i==0?0:i==13?1:2;float progress=Math.min(i,12)/12f;MotionEvent e=MotionEvent.obtain(down,SystemClock.uptimeMillis(),action,x+dx*progress,y+dy*progress,0);e.setSource(InputDevice.SOURCE_TOUCHSCREEN);sendPointerSync(e);e.recycle();Thread.sleep(16);}waitForIdleSync();Thread.sleep(200);}
+    void overlayUiChecks()throws Exception{
+        Context ctx=getTargetContext();LedgerDb db=new LedgerDb(ctx);for(int i=0;i<40;i++){String id="overlay-"+i;db.delete(id);db.save(new Ledger.Entry(id,"2026-10-27","지출",1,"오버레이 테스트","버튼 아래로 이어지는 내역 "+i,0),false);}db.close();
+        MainActivity app=(MainActivity)startActivitySync(new Intent(ctx,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();runOnMainSync(()->{try{set(app,"month",YearMonth.of(2026,10));set(app,"selected",LocalDate.of(2026,10,27));}catch(Exception e){throw new RuntimeException(e);}});navigate(app,0);float density=app.getResources().getDisplayMetrics().density;
+        LinearLayout content=(LinearLayout)fieldValue(app,"bodyContent");ScrollView scroll=(ScrollView)fieldValue(app,"pageScroll");View body=(View)content.getParent();eq(0,content.getPaddingBottom());eq(body.getWidth(),content.getWidth());eq(body.getHeight(),scroll.getHeight());eq(0,((FrameLayout.LayoutParams)content.getLayoutParams()).rightMargin);android.graphics.Rect calendar=screenRect(scroll),add=screenRect(findDesc(app.getWindow().getDecorView(),"수입, 지출, 저축 기록 추가"));eq(true,calendar.contains(add.centerX(),add.centerY()));
+        swipeScreen(calendar.left+35*density,calendar.bottom-10*density,0,-120*density);eq(true,scroll.getScrollY()>0);eq(false,activeText("새 기록"));screenshot(ctx,"overlay-calendar-"+app.getResources().getConfiguration().fontScale);
+        navigate(app,1);content=(LinearLayout)fieldValue(app,"bodyContent");scroll=(ScrollView)fieldValue(app,"pageScroll");body=(View)content.getParent();eq(body.getWidth(),content.getWidth());eq(body.getWidth(),scroll.getWidth());eq(0,((FrameLayout.LayoutParams)content.getLayoutParams()).rightMargin);LinearLayout list=(LinearLayout)fieldValue(app,"recordList");eq(true,list.getWidth()>=body.getWidth()-34*density);
+        View search=findDesc(app.getWindow().getDecorView(),"메모 검색"),sort=findDesc(app.getWindow().getDecorView(),"카테고리 정렬");android.graphics.Rect searchBounds=screenRect(search),sortBounds=screenRect(sort);eq(true,screenRect(scroll).contains(searchBounds.centerX(),searchBounds.centerY()));boolean overlaps=false;for(int i=0;i<list.getChildCount();i++){View row=list.getChildAt(i);if(row.getContentDescription()!=null&&row.getContentDescription().toString().contains("오버레이 테스트")){android.graphics.Rect bounds=screenRect(row);if(android.graphics.Rect.intersects(bounds,searchBounds)||android.graphics.Rect.intersects(bounds,sortBounds))overlaps=true;}}eq(true,overlaps);
+        TextView az=(TextView)((FrameLayout)sort).getChildAt(0);eq("A–Z",az.getText().toString());eq(1,az.getLineCount());eq(true,az.getPaint().measureText(az.getText().toString())<=az.getWidth()-az.getPaddingLeft()-az.getPaddingRight()+1);eq(0,az.getLayout().getEllipsisCount(0));eq(true,az.getPaint().getFontMetrics().descent-az.getPaint().getFontMetrics().ascent<=az.getHeight()+1);
+        TextView balance=(TextView)findText(app.getWindow().getDecorView(),"1,975,837원");eq(true,balance!=null);eq(1,balance.getLineCount());eq(true,balance.getPaint().measureText(balance.getText().toString())<=balance.getWidth()+1);eq(0,balance.getLayout().getEllipsisCount(0));
+        float gap=(searchBounds.bottom+sortBounds.top)/2f;int before=scroll.getScrollY();swipeScreen(searchBounds.centerX(),gap,0,-70*density);eq(true,scroll.getScrollY()>before);screenshot(ctx,"overlay-history-"+app.getResources().getConfiguration().fontScale);
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"메모 검색").performClick());waitForIdleSync();eq(true,activeText("메모로 검색하기"));clickText("취소");waitForIdleSync();runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"카테고리 정렬").performClick());waitForIdleSync();eq(true,activeText("선택한 카테고리로 정렬"));clickText("취소");waitForIdleSync();runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"수입, 지출, 저축 기록 추가").performClick());waitForIdleSync();eq(true,activeText("새 기록"));clickText("취소");waitForIdleSync();
+        runOnMainSync(()->{new AppPreferences(ctx).dark(true);try{invoke(app,"applyAppearance");invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();screenshot(ctx,"overlay-history-dark-"+app.getResources().getConfiguration().fontScale);runOnMainSync(()->{new AppPreferences(ctx).dark(false);try{invoke(app,"applyAppearance");}catch(Exception e){throw new RuntimeException(e);}});db=new LedgerDb(ctx);for(int i=0;i<40;i++)db.delete("overlay-"+i);eq(6,db.all().size());db.close();runOnMainSync(()->app.finish());waitForIdleSync();
+    }
     void memoSearch(MainActivity app,String memo)throws Exception{runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"메모 검색").performClick());waitForIdleSync();List<AccessibilityNodeInfo> edits=new ArrayList<>();collectEdits(accessibilityRoot(),edits);eq(1,edits.size());setText(edits.get(0),memo);clickText("검색");waitForIdleSync();}
     int countDesc(View v,String desc){int count=desc.contentEquals(v.getContentDescription()==null?"":v.getContentDescription())?1:0;if(v instanceof ViewGroup){ViewGroup group=(ViewGroup)v;for(int i=0;i<group.getChildCount();i++)count+=countDesc(group.getChildAt(i),desc);}return count;}
     void historyUiChecks()throws Exception{
