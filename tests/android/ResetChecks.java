@@ -80,7 +80,7 @@ final class ResetChecks {
         try(OutputStream out=ctx.getContentResolver().openOutputStream(uri)){bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();
     }
     static void verify(DeviceChecks t)throws Exception {
-        Context ctx=t.getTargetContext();t.eq("0.8.6",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
+        Context ctx=t.getTargetContext();t.eq("0.8.7",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
         for(String name:new String[]{"app_preferences","category_choices","backup_status"})t.eq(true,ctx.getSharedPreferences(name,0).getAll().isEmpty());
         t.eq(false,new File(ctx.getFilesDir(),"reset-private-sentinel").exists());t.eq(false,new File(ctx.getCacheDir(),"reset-cache-sentinel").exists());
         t.eq(null,ctx.getSystemService(JobScheduler.class).getPendingJob(BackupReminderService.JOB));
@@ -88,9 +88,9 @@ final class ResetChecks {
             t.eq(0,db.all().size());t.eq(0,db.openingAssets().size());t.eq(0,db.movements().size());
             try(android.database.Cursor c=db.getReadableDatabase().rawQuery("SELECT count(*) FROM feature_state",null)){c.moveToFirst();t.eq(0L,c.getLong(0));}t.eq(4,db.getReadableDatabase().getVersion());
         }
-        AppPreferences prefs=new AppPreferences(ctx);t.eq(false,prefs.hasPin());t.eq(false,prefs.dark());t.eq("system",prefs.fontId());t.eq(2,prefs.startTab());
+        AppPreferences prefs=new AppPreferences(ctx);t.eq(false,prefs.hasPin());t.eq(false,prefs.dark());t.eq("system",prefs.fontId());t.eq(5,prefs.startTab());
         Activity app=t.startActivitySync(new Intent(ctx,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));t.waitForIdleSync();
-        t.eq(true,t.findDesc(app.getWindow().getDecorView(),"통계 탭").isSelected());t.eq(false,t.activeText("차곡가계부 잠금"));
+        t.eq(true,t.findDesc(app.getWindow().getDecorView(),"홈 탭").isSelected());t.eq(false,t.activeText("차곡가계부 잠금"));
         t.screenshot(ctx,"reset-first-launch");t.runOnMainSync(()->app.finish());t.waitForIdleSync();
     }
 }

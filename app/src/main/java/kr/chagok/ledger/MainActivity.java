@@ -36,7 +36,7 @@ public final class MainActivity extends Activity {
     private AppPreferences preferences;
     private Typeface appFont=Typeface.DEFAULT;
     private boolean unlocked;
-    private boolean stopped;
+    private boolean stopped,paused;
     private Dialog lockDialog,exitDialog;
     private Runnable unregisterBack,unregisterExitBack;
     private XlsxIO.ReadResult pendingRead;
@@ -49,7 +49,7 @@ public final class MainActivity extends Activity {
     private List<Ledger.Entry> all=new ArrayList<>(), monthly=new ArrayList<>();
     private YearMonth month=YearMonth.now();
     private LocalDate selected=LocalDate.now();
-    private int tab=2, statisticsType=-1, filter, displayLimit=100;
+    private int tab=5, statisticsType=-1, filter, displayLimit=100;
     private int statisticsMode=StatisticsPeriod.MONTH,statisticsYear=LocalDate.now().getYear();
     private LocalDate statisticsFrom=LocalDate.now().withDayOfMonth(1),statisticsTo=LocalDate.now();
     private LocalDate renderedStatisticsToday;
@@ -96,6 +96,7 @@ public final class MainActivity extends Activity {
         }
         if(state!=null){guideSection=state.getInt("guideSection",-1);planSection=state.getInt("planSection",0);trendMonths=state.getInt("trendMonths",6);String tm=state.getString("trendSelected");if(tm!=null)trendSelected=YearMonth.parse(tm);}
         if(getIntent().getBooleanExtra("open_backup",false))tab=3;
+        if(tab==6||tab==9)tab=5;
         render();
         if(Build.VERSION.SDK_INT>=33)unregisterBack=BackApi33.register(this,this::handleBack);
     }
@@ -109,7 +110,8 @@ public final class MainActivity extends Activity {
         if(pendingExportMonth!=null) out.putString("exportMonth",pendingExportMonth.toString());
         out.putBoolean("recordsAll",recordsAll);out.putInt("recordSort",recordSort);out.putStringArrayList("recordCategories",new ArrayList<>(recordCategories));
     }
-    @Override public void onResume(){super.onResume();stopped=false;if(preferences!=null && preferences.hasPin() && !unlocked)render();else if(tab==2&&statisticsMode==StatisticsPeriod.YTD&&!LocalDate.now().equals(renderedStatisticsToday))render();else if(tab==1&&historyRail!=null){historyActions.endScroll();updateHistoryActions(false);}}
+    @Override public void onPause(){paused=true;dismissExitDialog();super.onPause();}
+    @Override public void onResume(){super.onResume();boolean reopenHome=(stopped||paused)&&(tab==6||tab==9)&&!busy;stopped=false;paused=false;if(reopenHome)tab=5;if(preferences!=null && preferences.hasPin() && !unlocked)render();else if(reopenHome)render();else if(tab==2&&statisticsMode==StatisticsPeriod.YTD&&!LocalDate.now().equals(renderedStatisticsToday))render();else if(tab==1&&historyRail!=null){historyActions.endScroll();updateHistoryActions(false);}}
     @Override public void onStop(){stopped=true;dismissExitDialog();if(historyRail!=null&&revealHistoryRail!=null)historyRail.removeCallbacks(revealHistoryRail);if(preferences!=null && preferences.hasPin() && !isChangingConfigurations())unlocked=false;super.onStop();}
     @Override public void onBackPressed(){handleBack();}
     private void handleBack(){
@@ -285,7 +287,7 @@ public final class MainActivity extends Activity {
         settingItem("월별 추이·전월 비교","최근 6개월 또는 12개월의 네 유형을 비교해요.",()->navigate(8));
         space(page,16);settingItem("홈 화면 커스텀","오늘·이번 주·이번 달·올해·전체의 수입, 지출, 저축, 투자, 합계를 골라 표시해요.",this::customizeHome);
         settingItem("상세 분류 관리","수입·지출·저축·투자 상세 분류를 삭제하거나 복원해요. 기존 거래는 유지해요.",()->manageCategories("지출",null));
-        settingItem("시작 화면 설정","앱을 처음 열 때 나타날 화면을 선택해요.",this::chooseStartScreen);
+        settingItem("시작 화면 설정","기본 시작 화면은 홈이에요. 원하는 시작 화면으로 바꿀 수 있어요.",this::chooseStartScreen);
         settingItem("폰트 설정","휴대폰 기본 글꼴, 나눔고딕, 나눔명조를 선택해요.",this::chooseFont);
         LinearLayout dark=card(page);Switch toggle=new Switch(this);toggle.setText("다크 모드");toggle.setTextSize(16);toggle.setTextColor(INK);toggle.setTypeface(appFont,Typeface.BOLD);toggle.setChecked(preferences.dark());toggle.setContentDescription("다크 모드");dark.addView(toggle);toggle.setOnCheckedChangeListener((v,on)->{preferences.dark(on);applyAppearance();render();});
         settingItem(preferences.hasPin()?"비밀번호 잠금 해제":"비밀번호 설정",preferences.hasPin()?"앱을 다시 열 때 숫자 비밀번호로 잠금을 해제해요.":"4~12자리 숫자로 앱을 잠글 수 있어요.",()->{if(preferences.hasPin())verifyPinDialog("잠금 해제",()->{preferences.setPinHash("");unlocked=true;applyAppearance();render();});else setupPin();});
@@ -822,7 +824,7 @@ public final class MainActivity extends Activity {
 
     private void planningShortcut(){
         PlanningData plan=db.planning();LinearLayout c=card(page);c.addView(text("이번 달 계획",18,INK,true));space(c,8);
-        List<PlanningData.Limit> budgets=plan.effective(YearMonth.now(),"지출");for(PlanningData.Limit l:budgets)if(l.category.isEmpty()){PlanningData.Progress p=PlanningData.progress(l,YearMonth.now(),all);c.addView(label("생활비 "+won(p.actual)+" / "+won(p.target)+" · "+(p.remaining>=0?"남은 예산 "+won(p.remaining):"예산 초과 "+won(-p.remaining)),13,p.remaining<0?RED:MUTED));}
+        List<PlanningData.Limit> budgets=plan.effective(YearMonth.now(),"지출");for(PlanningData.Limit l:budgets)if(l.category.isEmpty()){PlanningData.Progress p=plan.budgetProgress(l,YearMonth.now(),all);c.addView(label("생활비 "+won(p.actual)+" / "+won(p.target)+" · "+(p.remaining>=0?"남은 예산 "+won(p.remaining):"예산 초과 "+won(-p.remaining)),13,p.remaining<0?RED:MUTED));if(plan.hasLivingFilter())c.addView(label("전체 지출 "+won(PlanningData.progress(l,YearMonth.now(),all).actual)+" · 생활비 반영 "+won(p.actual),12,MUTED));}
         long due=plan.repeats.stream().filter(r->r.due(LocalDate.now())).count();if(due>0){space(c,7);c.addView(label("확인할 반복 기록 "+due+"건",14,RED));}
         space(c,12);c.addView(button("예산·목표·반복 관리",GREEN,true,()->{month=YearMonth.now();navigate(7);}));space(c,8);c.addView(button("기초자산·현재 보유",GREEN,false,this::openingList));space(c,8);c.addView(button("자주 쓰는 기록",GREEN,false,this::pickFavorite));space(c,8);c.addView(button("월별 추이·전월 비교",GREEN,false,()->{month=YearMonth.now();trendSelected=month;navigate(8);}));
         if(backupStatus.stale(System.currentTimeMillis())){space(c,12);c.addView(button("전체 백업을 확인해 주세요",RED,false,()->navigate(3)));}
@@ -847,11 +849,21 @@ public final class MainActivity extends Activity {
     }
     private void limitCards(PlanningData plan,String type){
         List<PlanningData.Limit> limits=plan.effective(month,type);if(limits.isEmpty()){page.addView(label(type+"의 설정된 "+("지출".equals(type)?"예산":"목표")+"가 없어요.",14,MUTED));space(page,12);}
-        for(PlanningData.Limit l:limits){PlanningData.Progress p=PlanningData.progress(l,month,all);LinearLayout c=card(page);String name=l.category.isEmpty()?type+" 전체 "+("지출".equals(type)?"예산":"목표"):l.category+("지출".equals(type)?" 예산":" "+type+" 목표");c.addView(text(name,18,COLORS[Ledger.index(type)],true));space(c,8);c.addView(label(won(p.actual)+" / "+won(p.target)+" · "+String.format(Locale.KOREA,"%.1f%%",p.percent),15,INK));space(c,8);c.addView(new TypeComparisonBarView(this,Math.min(1,p.actual/(double)p.target),COLORS[Ledger.index(type)],LINE),new LinearLayout.LayoutParams(-1,dp(10)));space(c,8);String status="지출".equals(type)?(p.remaining>=0?"남은 예산 "+won(p.remaining):"예산 초과 "+won(-p.remaining)):(p.remaining>0?"목표까지 "+won(p.remaining):"목표 달성"+(p.remaining<0?" · 추가 납입 "+won(-p.remaining):""));c.addView(label(status,14,p.remaining<0&&"지출".equals(type)?RED:GREEN));space(c,4);c.addView(label(l.month.equals("*")?"매월 기본 금액":l.month+"에만 적용",12,MUTED));c.setContentDescription(name+" 진행 "+p.actual+" / "+p.target+"원");space(c,10);c.addView(button("금액·적용 범위 수정",GREEN,false,()->limitEditor(l,type)));}
+        for(PlanningData.Limit l:limits){PlanningData.Progress p=plan.budgetProgress(l,month,all);LinearLayout c=card(page);String name=l.category.isEmpty()?type+" 전체 "+("지출".equals(type)?"예산":"목표"):l.category+("지출".equals(type)?" 예산":" "+type+" 목표");c.addView(text(name,18,COLORS[Ledger.index(type)],true));space(c,8);c.addView(label(won(p.actual)+" / "+won(p.target)+" · "+String.format(Locale.KOREA,"%.1f%%",p.percent),15,INK));space(c,8);c.addView(new TypeComparisonBarView(this,Math.min(1,p.actual/(double)p.target),COLORS[Ledger.index(type)],LINE),new LinearLayout.LayoutParams(-1,dp(10)));space(c,8);String status="지출".equals(type)?(p.remaining>=0?"남은 예산 "+won(p.remaining):"예산 초과 "+won(-p.remaining)):(p.remaining>0?"목표까지 "+won(p.remaining):"목표 달성"+(p.remaining<0?" · 추가 납입 "+won(-p.remaining):""));c.addView(label(status,14,p.remaining<0&&"지출".equals(type)?RED:GREEN));space(c,4);c.addView(label(l.month.equals("*")?"매월 기본 금액":l.month+"에만 적용",12,MUTED));c.setContentDescription(name+" 진행 "+p.actual+" / "+p.target+"원");
+            if(type.equals("지출")&&l.category.isEmpty()){space(c,8);c.addView(label("전체 지출 "+won(PlanningData.progress(l,month,all).actual),13,MUTED));c.addView(label("생활비 반영 지출 "+won(p.actual),13,INK));c.addView(label(plan.hasLivingFilter()?"선택한 상세분류만 반영 · 모든 월 공통":"현재 모든 지출 반영",12,MUTED));}space(c,10);c.addView(button("금액·적용 범위 수정",GREEN,false,()->limitEditor(l,type)));}
     }
     private void limitEditor(PlanningData.Limit old,String type){
         LinearLayout form=planForm();EditText amount=field(form,"금액 (원)",old==null?"":String.valueOf(old.amount),android.text.InputType.TYPE_CLASS_NUMBER);EditText category=field(form,"상세 분류 (비우면 전체)",old==null?"":old.category,android.text.InputType.TYPE_CLASS_TEXT);category.setSingleLine(true);category.setFilters(new InputFilter[]{new InputFilter.LengthFilter(40)});CheckBox monthly=new CheckBox(this);monthly.setText("매월 같은 금액으로 적용");monthly.setChecked(old!=null&&old.month.equals("*"));monthly.setTextColor(INK);monthly.setTypeface(appFont);form.addView(monthly);form.addView(label("선택하지 않으면 "+month+"에만 적용해요. 이 달에 따로 설정한 금액이 매월 기본값보다 우선해요.",12,MUTED));
-        planDialog(type+("지출".equals(type)?" 예산 설정":" 목표 설정"),form,()->{PlanningData.Limit limit=new PlanningData.Limit(monthly.isChecked()?"*":month.toString(),type,category.getText().toString(),Ledger.parseAmount(amount.getText().toString()));PlanningData p=db.planning();if(old!=null)p.limits.removeIf(l->l.key().equals(old.key()));p.put(limit);db.savePlanning(p);},old==null?null:()->{PlanningData p=db.planning();p.limits.removeIf(l->l.key().equals(old.key()));db.savePlanning(p);});
+        final LivingBudgetSelector selection;
+        if(type.equals("지출")){
+            PlanningData current=db.planning();List<Ledger.Entry> records=db.all();LinkedHashSet<String> options=new LinkedHashSet<>(categories.choices("지출",records));
+            TreeSet<String> used=new TreeSet<>();for(Ledger.Entry e:records)if(e.type.equals("지출"))used.add(e.category);options.addAll(used);options.addAll(current.livingCategories());
+            Set<String> chosen=current.hasLivingFilter()?current.livingCategories():options;
+            selection=new LivingBudgetSelector(this,new ArrayList<>(options),chosen,amount,month,records,INK,MUTED,GREEN,INPUT,appFont);form.addView(selection);
+            Runnable visibility=()->selection.setVisibility(category.getText().toString().trim().isEmpty()?View.VISIBLE:View.GONE);visibility.run();
+            category.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){visibility.run();}public void afterTextChanged(Editable value){}});
+        }else selection=null;
+        planDialog(type+("지출".equals(type)?" 예산 설정":" 목표 설정"),form,()->{PlanningData.Limit limit=new PlanningData.Limit(monthly.isChecked()?"*":month.toString(),type,category.getText().toString(),Ledger.parseAmount(amount.getText().toString()));PlanningData p=db.planning();if(old!=null)p.limits.removeIf(l->l.key().equals(old.key()));p.put(limit);if(selection!=null&&limit.category.isEmpty())p.selectLivingCategories(selection.selected());db.savePlanning(p);},old==null?null:()->{PlanningData p=db.planning();p.limits.removeIf(l->l.key().equals(old.key()));db.savePlanning(p);});
     }
     private String cadenceName(String cadence){return "WEEKLY".equals(cadence)?"매주":"YEARLY".equals(cadence)?"매년":"매월";}
     private void repeatEditor(PlanningData.Repeat old){
@@ -878,7 +890,7 @@ public final class MainActivity extends Activity {
     }
     private String changeText(PlanningData.Change c){String delta=c.difference>0?"+"+won(c.difference):won(c.difference);return "지난달 "+won(c.previous)+" → "+delta+" · "+(c.percent==null?(c.current==0?"변동 없음":"지난달 0원이라 비율 계산 안 함"):String.format(Locale.KOREA,"%+.1f%%",c.percent));}
     private void backupPanel(){
-        LinearLayout c=card(page);c.addView(text("백업 관리",20,INK,true));space(c,8);String last=backupStatus.last()==0?"아직 전체 백업 기록이 없어요.":"최근 전체 백업 "+Instant.ofEpochMilli(backupStatus.last()).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm"))+"\n"+backupStatus.kind()+" · "+backupStatus.count()+"건";c.addView(label(last,14,INK));if(backupStatus.stale(System.currentTimeMillis())){space(c,8);c.addView(label("전체 백업한 지 7일 이상 지났어요. 기록을 따로 보관하세요.",14,RED));}space(c,12);c.addView(button("지금 전체 내역 백업",GREEN,true,()->chooseExport(EXPORT)));space(c,8);c.addView(button("계획 포함 백업 만들기 (.zip)",GREEN,false,()->chooseArchive(true)));space(c,8);c.addView(button("계획 포함 백업 가져오기",GREEN,false,()->chooseArchive(false)));space(c,10);c.addView(label("엑셀은 거래 내역만 저장해요. 계획 포함 백업은 내역과 예산·목표·반복·자주 쓰는 기록을 함께 저장해요. 비밀번호·화면 설정·상세 분류 숨김은 포함하지 않아요.",12,MUTED));space(c,10);TextView reminder=button(backupStatus.enabled()?"백업 알림 끄기":"백업 알림 켜기",GREEN,false,this::toggleBackupReminder);c.addView(reminder);space(c,6);c.addView(label("7일 이상 백업하지 않으면 앱 안에서 알려 드려요. 시스템 알림은 선택해서 켜며, 기기 상태에 따라 전달 시점이 달라질 수 있어요.",12,MUTED));
+        LinearLayout c=card(page);c.addView(text("백업 관리",20,INK,true));space(c,8);String last=backupStatus.last()==0?"아직 전체 백업 기록이 없어요.":"최근 전체 백업 "+Instant.ofEpochMilli(backupStatus.last()).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm"))+"\n"+backupStatus.kind()+" · "+backupStatus.count()+"건";c.addView(label(last,14,INK));if(backupStatus.stale(System.currentTimeMillis())){space(c,8);c.addView(label("전체 백업한 지 7일 이상 지났어요. 기록을 따로 보관하세요.",14,RED));}space(c,12);c.addView(button("지금 전체 내역 백업",GREEN,true,()->chooseExport(EXPORT)));space(c,8);c.addView(button("계획 포함 백업 만들기 (.zip)",GREEN,false,()->chooseArchive(true)));space(c,8);c.addView(button("계획 포함 백업 가져오기",GREEN,false,()->chooseArchive(false)));space(c,10);c.addView(label("엑셀은 거래·기초자산을 저장해요. 계획 포함 백업은 생활비 반영 분류와 예산·목표·반복·자주 쓰는 기록도 함께 저장해요. 비밀번호·화면 설정·상세 분류 숨김은 포함하지 않아요.",12,MUTED));space(c,10);TextView reminder=button(backupStatus.enabled()?"백업 알림 끄기":"백업 알림 켜기",GREEN,false,this::toggleBackupReminder);c.addView(reminder);space(c,6);c.addView(label("7일 이상 백업하지 않으면 앱 안에서 알려 드려요. 시스템 알림은 선택해서 켜며, 기기 상태에 따라 전달 시점이 달라질 수 있어요.",12,MUTED));
     }
     private void toggleBackupReminder(){if(backupStatus.enabled()){backupStatus.enabled(false);BackupReminderService.schedule(this);render();return;}if(Build.VERSION.SDK_INT>=33&&checkSelfPermission("android.permission.POST_NOTIFICATIONS")!=android.content.pm.PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"},61);return;}backupStatus.enabled(true);BackupReminderService.schedule(this);render();}
     @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==61){backupStatus.enabled(grants.length>0&&grants[0]==android.content.pm.PackageManager.PERMISSION_GRANTED);BackupReminderService.schedule(this);render();}}
@@ -887,6 +899,7 @@ public final class MainActivity extends Activity {
     private void previewArchive(BackupArchive.Snapshot snapshot){
         if(isFinishing()||isDestroyed())return;if(preferences.hasPin()&&!unlocked){pendingArchive=snapshot;return;}
         try{Ledger.ImportPlan plan=db.planImport(snapshot.entries,snapshot.openingAssets,snapshot.movements);if(!plan.errors.isEmpty()){error("파일을 확인해 주세요",joinErrors(plan.errors));return;}PlanningData old=db.planning(),merged=PlanningData.merge(old,snapshot.planning);int added=merged.limits.size()+merged.repeats.size()+merged.favorites.size()-old.limits.size()-old.repeats.size()-old.favorites.size();String text="기초자산 "+snapshot.openingAssets.size()+"건 포함\n저축 이동 "+snapshot.movements.size()+"건 포함\n새 내역 "+plan.additions.size()+"건 · 중복 제외 "+plan.duplicates+"건\n새 계획 설정 "+added+"개\n\n기존 내역과 설정은 지우지 않아요. 같은 예산·목표 또는 같은 ID의 반복·자주 쓰는 기록은 현재 설정을 유지해요. 비밀번호와 화면 설정은 바꾸지 않아요.";
+            if(snapshot.planning.hasLivingFilter())text+="\n\n생활비 반영 분류 "+snapshot.planning.livingCategories().size()+"개 · 모든 월 공통\n"+(old.hasLivingFilter()?"현재의 생활비 분류 선택을 유지해요.":"백업의 생활비 분류 선택을 함께 가져와요.");
             new AlertDialog.Builder(this).setTitle("계획 포함 백업 가져오기").setMessage(text).setNegativeButton("취소",null).setPositiveButton("확인하고 추가",(d,w)->{setBusy("내역과 계획을 저장하고 있어요");io.execute(()->{try{Ledger.ImportPlan committed=db.importPlanningAtomic(snapshot);runOnUiThread(()->{clearBusy();if(!committed.errors.isEmpty())error("가져오지 못했어요",joinErrors(committed.errors));else{render();toast("내역과 계획을 가져왔어요.");}});}catch(Exception ex){runOnUiThread(()->{clearBusy();error("저장하지 못했어요",message(ex));});}});}).show();
         }catch(Exception ex){error("백업을 확인해 주세요",message(ex));}
     }

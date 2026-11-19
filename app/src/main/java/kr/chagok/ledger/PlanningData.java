@@ -10,6 +10,14 @@ final class PlanningData {
     final List<Limit> limits=new ArrayList<>();
     final List<Repeat> repeats=new ArrayList<>();
     final List<Favorite> favorites=new ArrayList<>();
+    /** Null preserves legacy all-expense behaviour; an empty set explicitly includes none. */
+    private Set<String> livingCategories;
+    boolean hasLivingFilter(){return livingCategories!=null;}
+    Set<String> livingCategories(){return livingCategories==null?Collections.emptySet():Collections.unmodifiableSet(livingCategories);}
+    void selectLivingCategories(Collection<String> names){
+        if(names==null||names.size()>10_000)throw new IllegalArgumentException("생활비 상세 분류는 최대 10,000개예요.");
+        Set<String> selected=new TreeSet<>();for(String name:names){String cleaned=name==null?"":name.trim();if(cleaned.isEmpty()||cleaned.length()>40)throw new IllegalArgumentException("생활비 상세 분류 이름을 확인하세요.");selected.add(cleaned);}livingCategories=selected;
+    }
     static String title(String value){String s=value==null?"":value.trim();if(s.isEmpty()||s.length()>40)throw new IllegalArgumentException("이름은 1~40자로 입력하세요.");return s;}
     static String id(String value){if(value==null||!value.matches("[A-Za-z0-9_-]{1,64}"))throw new IllegalArgumentException("설정 ID를 확인하세요.");return value;}
     static final class Limit {
@@ -61,6 +69,12 @@ final class PlanningData {
         long actual=0;for(Ledger.Entry e:entries)if(e.date.startsWith(month.toString())&&e.type.equals(limit.type)&&(limit.category.isEmpty()||e.category.equals(limit.category)))actual=Math.addExact(actual,e.amount);
         return new Progress(limit.amount,actual);
     }
+    /** Selection applies only to the overall monthly living budget, never other totals/goals. */
+    Progress budgetProgress(Limit limit,YearMonth month,List<Ledger.Entry> entries){
+        if(!limit.type.equals("지출")||!limit.category.isEmpty()||livingCategories==null)return progress(limit,month,entries);
+        long actual=0;for(Ledger.Entry e:entries)if(e.type.equals("지출")&&e.date.startsWith(month.toString())&&livingCategories.contains(e.category))actual=Math.addExact(actual,e.amount);
+        return new Progress(limit.amount,actual);
+    }
     static final class MonthTotal {
         final YearMonth month;final long[] totals;
         MonthTotal(YearMonth month,long[] totals){this.month=month;this.totals=totals;}
@@ -86,23 +100,25 @@ final class PlanningData {
     static PlanningData merge(PlanningData existing,PlanningData incoming){
         PlanningData out=decode(existing.encode());Set<String> keys=new HashSet<>();for(Limit l:out.limits)keys.add(l.key());for(Limit l:incoming.limits)if(keys.add(l.key()))out.put(l);
         keys.clear();for(Repeat r:out.repeats)keys.add(r.id);for(Repeat r:incoming.repeats)if(keys.add(r.id))out.put(r);
-        keys.clear();for(Favorite f:out.favorites)keys.add(f.id);for(Favorite f:incoming.favorites)if(keys.add(f.id))out.put(f);return out;
+        keys.clear();for(Favorite f:out.favorites)keys.add(f.id);for(Favorite f:incoming.favorites)if(keys.add(f.id))out.put(f);if(!out.hasLivingFilter()&&incoming.hasLivingFilter())out.selectLivingCategories(incoming.livingCategories());return out;
     }
     String encode(){
-        try{ByteArrayOutputStream bytes=new ByteArrayOutputStream();DataOutputStream out=new DataOutputStream(bytes);out.writeInt(0x43485031);out.writeInt(limits.size());
+        try{ByteArrayOutputStream bytes=new ByteArrayOutputStream();DataOutputStream out=new DataOutputStream(bytes);out.writeInt(hasLivingFilter()?0x43485032:0x43485031);out.writeInt(limits.size());
             for(Limit l:limits){out.writeUTF(l.month);out.writeUTF(l.type);out.writeUTF(l.category);out.writeLong(l.amount);}
             out.writeInt(repeats.size());for(Repeat r:repeats){out.writeUTF(r.id);out.writeUTF(r.name);out.writeUTF(r.type);out.writeLong(r.amount);out.writeUTF(r.category);out.writeUTF(r.memo);out.writeUTF(r.cadence);out.writeUTF(r.next.toString());out.writeInt(r.anchorDay);out.writeInt(r.anchorMonth);out.writeBoolean(r.enabled);}
-            out.writeInt(favorites.size());for(Favorite f:favorites){out.writeUTF(f.id);out.writeUTF(f.name);out.writeUTF(f.type);out.writeLong(f.amount);out.writeUTF(f.category);out.writeUTF(f.memo);}out.flush();return Base64.getEncoder().encodeToString(bytes.toByteArray());
+            out.writeInt(favorites.size());for(Favorite f:favorites){out.writeUTF(f.id);out.writeUTF(f.name);out.writeUTF(f.type);out.writeLong(f.amount);out.writeUTF(f.category);out.writeUTF(f.memo);}if(hasLivingFilter()){out.writeInt(livingCategories.size());for(String category:livingCategories)out.writeUTF(category);}out.flush();return Base64.getEncoder().encodeToString(bytes.toByteArray());
         }catch(IOException ex){throw new IllegalStateException("계획을 저장하지 못했어요.",ex);}
     }
     static int count(DataInputStream in)throws IOException{int n=in.readInt();if(n<0||n>MAX_ITEMS)throw new IOException("Too many settings");return n;}
     static PlanningData decode(String encoded){
         PlanningData p=new PlanningData();if(encoded==null||encoded.isEmpty())return p;
         if(encoded.length()>4_000_000)throw new IllegalArgumentException("계획 파일이 너무 커요.");
-        try{DataInputStream in=new DataInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(encoded)));if(in.readInt()!=0x43485031)throw new IOException("Unsupported planning version");
+        try{DataInputStream in=new DataInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(encoded)));int version=in.readInt();if(version!=0x43485031&&version!=0x43485032)throw new IOException("Unsupported planning version");
             Set<String> keys=new HashSet<>();int n=count(in);for(int i=0;i<n;i++){Limit l=new Limit(in.readUTF(),in.readUTF(),in.readUTF(),in.readLong());if(!keys.add(l.key()))throw new IOException("Duplicate limit");p.put(l);}
             keys.clear();n=count(in);for(int i=0;i<n;i++){Repeat r=new Repeat(in.readUTF(),in.readUTF(),in.readUTF(),in.readLong(),in.readUTF(),in.readUTF(),in.readUTF(),LocalDate.parse(in.readUTF()),in.readInt(),in.readInt(),in.readBoolean());if(!keys.add(r.id))throw new IOException("Duplicate repeat");p.put(r);}
-            keys.clear();n=count(in);for(int i=0;i<n;i++){Favorite f=new Favorite(in.readUTF(),in.readUTF(),in.readUTF(),in.readLong(),in.readUTF(),in.readUTF());if(!keys.add(f.id))throw new IOException("Duplicate favorite");p.put(f);}if(in.read()!=-1)throw new IOException("Unexpected trailing data");return p;
+            keys.clear();n=count(in);for(int i=0;i<n;i++){Favorite f=new Favorite(in.readUTF(),in.readUTF(),in.readUTF(),in.readLong(),in.readUTF(),in.readUTF());if(!keys.add(f.id))throw new IOException("Duplicate favorite");p.put(f);}
+            if(version==0x43485032){n=in.readInt();if(n<0||n>10_000)throw new IOException("Too many living categories");Set<String> selected=new TreeSet<>();for(int i=0;i<n;i++){String name=in.readUTF();if(!selected.add(name)||!name.equals(name.trim()))throw new IOException("Invalid living category");}p.selectLivingCategories(selected);}
+            if(in.read()!=-1)throw new IOException("Unexpected trailing data");return p;
         }catch(Exception ex){throw new IllegalArgumentException("계획 파일이 손상됐거나 지원하지 않는 형식이에요.",ex);}
     }
 }

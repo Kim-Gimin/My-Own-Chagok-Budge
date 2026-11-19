@@ -12,7 +12,7 @@ final class AppPreferences {
     boolean historyActionsExpanded(){return prefs.getBoolean("history_actions_expanded",true);}
     void historyActionsExpanded(boolean expanded){prefs.edit().putBoolean("history_actions_expanded",expanded).commit();}
     void dark(boolean enabled){prefs.edit().putBoolean("dark",enabled).commit();}
-    int startTab(){int tab=prefs.getInt("start_tab",2);return Arrays.asList(4,2,5,0,1).contains(tab)?tab:2;}
+    int startTab(){int tab=prefs.getInt("start_tab",5);return Arrays.asList(4,2,5,0,1).contains(tab)?tab:5;}
     void startTab(int tab){prefs.edit().putInt("start_tab",tab).commit();}
     String fontId(){return prefs.getString("font","system");}
     void fontId(String id){prefs.edit().putString("font",id).commit();}
