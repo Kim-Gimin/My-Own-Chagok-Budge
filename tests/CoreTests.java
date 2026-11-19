@@ -54,9 +54,28 @@ public final class CoreTests {
         OverviewData.Settlement jan=OverviewData.settle(entries,YearMonth.of(2026,1),YearMonth.of(2026,1));eq(1,jan.months.size());eq(330L,jan.balance());eq(100L,jan.totals[2]);eq(-30L,OverviewData.settle(entries,YearMonth.of(2026,2),YearMonth.of(2026,12)).balance());rejects(()->OverviewData.settle(entries,YearMonth.of(2027,1),YearMonth.of(2026,12)));
         Map<String,Long> metrics=new HashMap<>();for(OverviewData.Metric m:OverviewData.metrics(entries,LocalDate.of(2026,1,4)))metrics.put(m.id,m.amount);eq(20,metrics.size());eq(500L,metrics.get("today_3"));eq(1350L,metrics.get("week_3"));eq(330L,metrics.get("month_3"));eq(300L,metrics.get("year_3"));eq(1300L,metrics.get("all_3"));metrics.clear();for(OverviewData.Metric m:OverviewData.metrics(entries,LocalDate.of(2026,1,5)))metrics.put(m.id,m.amount);eq(-20L,metrics.get("week_3"));eq(0,OverviewData.settle(Collections.emptyList(),null,null).months.size());
     }
+    private static void near(float expected,float actual){checks++;if(Math.abs(expected-actual)>0.001f)throw new AssertionError("expected="+expected+", actual="+actual);}
+    private static void iconGeometryChecks(){
+        // 0.6.1의 통계(41x36)·기타 화면(36x42) 칸에서도 가로·세로 같은 비율로 가운데 그린다.
+        for(int[] box:new int[][]{{41,36,5,5,5,5},{36,42,5,5,5,5},{48,48,12,12,12,12},{23,23,0,0,0,0},{126,135,34,34,34,34}}){
+            float[] f=IconGeometry.fit(box[0],box[1],box[2],box[3],box[4],box[5]);
+            float w=box[0]-box[2]-box[4],h=box[1]-box[3]-box[5],side=f[0]*IconGeometry.GRID;
+            near(Math.min(w,h),side);near(box[2]+w/2f,f[1]+side/2f);near(box[3]+h/2f,f[2]+side/2f);
+        }
+        float[] header=IconGeometry.fit(48,48,12,12,12,12);near(1f,header[0]);near(12f,header[1]);near(12f,header[2]);
+        float[] empty=IconGeometry.fit(10,10,6,6,6,6);near(0f,empty[0]);
+        // 톱니바퀴: 8개 톱니, 24 격자 안(선 굵기 포함), 좌우·상하 대칭, 위쪽 가운데 톱니.
+        float[] o=IconGeometry.gearOutline();eq(0,o.length%2);
+        float minX=99,maxX=-99,minY=99,maxY=-99;int outer=0;boolean ring=true;
+        for(int i=0;i<o.length;i+=2){double r=Math.hypot(o[i]-12,o[i+1]-12);ring&=r>=IconGeometry.GEAR_ROOT-0.001&&r<=IconGeometry.GEAR_OUTER+0.001;if(Math.abs(r-IconGeometry.GEAR_OUTER)<0.001)outer++;minX=Math.min(minX,o[i]);maxX=Math.max(maxX,o[i]);minY=Math.min(minY,o[i+1]);maxY=Math.max(maxY,o[i+1]);}
+        eq(true,ring);eq(IconGeometry.GEAR_TEETH*5,outer);eq(true,minX-0.9f>=0&&minY-0.9f>=0&&maxX+0.9f<=24&&maxY+0.9f<=24);
+        near(12-maxX,minX-12);near(12-maxY,minY-12);near(12-IconGeometry.GEAR_OUTER,minY);
+        eq(true,IconGeometry.GEAR_HOLE>1.5f&&IconGeometry.GEAR_HOLE+0.9f<IconGeometry.GEAR_ROOT-0.9f);
+    }
     public static void main(String[] args)throws Exception {
         overviewChecks();
         periodChecks();
+        iconGeometryChecks();
         historyChecks();
         String hash=PinCrypto.create("0842");eq(true,PinCrypto.verify("0842",hash));eq(false,PinCrypto.verify("842",hash));eq(false,PinCrypto.verify("9999",hash));eq(false,PinCrypto.verify("0842","bad"));eq(false,hash.equals(PinCrypto.create("0842")));rejects(()->PinCrypto.create("12"));rejects(()->PinCrypto.create("abcd"));
         eq("2024-02-29",Ledger.normalizeDate("2024/2/29")); eq("2026-10-27",Ledger.normalizeDate("20261027"));

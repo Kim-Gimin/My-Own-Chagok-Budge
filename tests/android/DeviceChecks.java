@@ -19,7 +19,7 @@ public class DeviceChecks extends Instrumentation {
     @Override public void onCreate(Bundle args){super.onCreate(args);mode=args==null?"":args.getString("mode","");start();}
     @Override public void onStart(){
         Bundle out=new Bundle();
-        try{if("upgrade".equals(mode))runUpgradeChecks();else if("preview".equals(mode))statisticsPreview();else if("revision".equals(mode))revisionUiChecks();else if("history".equals(mode))historyUiChecks();else if("overlay".equals(mode))overlayUiChecks();else if("workflow".equals(mode))entryWorkflowUiChecks();else if("iconbaseline".equals(mode))iconBaseline();else if("icon".equals(mode))iconChecks();else runChecks();out.putString("result","PASS: "+checks+" Android integration checks");finish(Activity.RESULT_OK,out);}
+        try{if("upgrade".equals(mode))runUpgradeChecks();else if("preview".equals(mode))statisticsPreview();else if("revision".equals(mode))revisionUiChecks();else if("history".equals(mode))historyUiChecks();else if("overlay".equals(mode))overlayUiChecks();else if("workflow".equals(mode))entryWorkflowUiChecks();else if("iconbaseline".equals(mode))iconBaseline();else if("icon".equals(mode))iconChecks();else if("settings".equals(mode))settingsHeaderChecks();else runChecks();out.putString("result","PASS: "+checks+" Android integration checks");finish(Activity.RESULT_OK,out);}
         catch(Throwable e){StringWriter sw=new StringWriter();e.printStackTrace(new PrintWriter(sw));out.putString("error",sw.toString());finish(Activity.RESULT_CANCELED,out);}
     }
     String dataSnapshot()throws Exception{
@@ -27,19 +27,19 @@ public class DeviceChecks extends Instrumentation {
         for(String file:new String[]{"app_preferences","category_choices"})for(Map.Entry<String,?> value:ctx.getSharedPreferences(file,Context.MODE_PRIVATE).getAll().entrySet()){Object v=value.getValue();if(v instanceof Set)v=new TreeSet<>((Set<String>)v);values.add(file+":"+value.getKey()+":"+v);}Collections.sort(values);return String.join("\n",values);
     }
     void iconBaseline()throws Exception{
-        Context ctx=getTargetContext();eq("0.6.0",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);try(Writer writer=new OutputStreamWriter(new FileOutputStream(new File(ctx.getExternalFilesDir(null),"before-icon-update.txt")),java.nio.charset.StandardCharsets.UTF_8)){writer.write(dataSnapshot());}
+        Context ctx=getTargetContext();String baseVersion=ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName;eq(true,"0.6.0".equals(baseVersion)||"0.6.1".equals(baseVersion));try(Writer writer=new OutputStreamWriter(new FileOutputStream(new File(ctx.getExternalFilesDir(null),"before-icon-update.txt")),java.nio.charset.StandardCharsets.UTF_8)){writer.write(dataSnapshot());}
         eq(true,ctx.getPackageManager().getApplicationIcon(ctx.getPackageName())!=null);
     }
     void iconBitmap(android.graphics.drawable.Drawable icon,String name,int size)throws Exception{Bitmap bitmap=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888);android.graphics.Canvas canvas=new android.graphics.Canvas(bitmap);icon.setBounds(0,0,size,size);icon.draw(canvas);eq(true,android.graphics.Color.alpha(bitmap.getPixel(size/2,size/2))>0);try(FileOutputStream output=new FileOutputStream(new File(getTargetContext().getExternalFilesDir(null),name+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,output);}bitmap.recycle();}
     void iconChecks()throws Exception{
         Context ctx=getTargetContext();String before;try(InputStream input=new FileInputStream(new File(ctx.getExternalFilesDir(null),"before-icon-update.txt"));ByteArrayOutputStream bytes=new ByteArrayOutputStream()){byte[] buffer=new byte[4096];int n;while((n=input.read(buffer))!=-1)bytes.write(buffer,0,n);before=new String(bytes.toByteArray(),java.nio.charset.StandardCharsets.UTF_8);}eq(before,dataSnapshot());
-        android.content.pm.PackageManager pm=ctx.getPackageManager();eq("0.6.1",pm.getPackageInfo(ctx.getPackageName(),0).versionName);eq(10,pm.getPackageInfo(ctx.getPackageName(),0).versionCode);android.graphics.drawable.Drawable icon=pm.getApplicationIcon(ctx.getPackageName());eq(true,icon instanceof android.graphics.drawable.AdaptiveIconDrawable);android.graphics.drawable.AdaptiveIconDrawable adaptive=(android.graphics.drawable.AdaptiveIconDrawable)icon;eq(true,adaptive.getForeground()!=null);eq(true,adaptive.getBackground()!=null);if(Build.VERSION.SDK_INT>=33){eq(true,adaptive.getMonochrome()!=null);android.graphics.drawable.Drawable mono=adaptive.getMonochrome();android.graphics.drawable.AdaptiveIconDrawable themed=new android.graphics.drawable.AdaptiveIconDrawable(new android.graphics.drawable.ColorDrawable(0xFFE2ECD9),mono);mono.setTint(0xFF28472D);iconBitmap(themed,"icon-b-native-themed",432);}
+        android.content.pm.PackageManager pm=ctx.getPackageManager();eq("0.6.2",pm.getPackageInfo(ctx.getPackageName(),0).versionName);eq(11,pm.getPackageInfo(ctx.getPackageName(),0).versionCode);android.graphics.drawable.Drawable icon=pm.getApplicationIcon(ctx.getPackageName());eq(true,icon instanceof android.graphics.drawable.AdaptiveIconDrawable);android.graphics.drawable.AdaptiveIconDrawable adaptive=(android.graphics.drawable.AdaptiveIconDrawable)icon;eq(true,adaptive.getForeground()!=null);eq(true,adaptive.getBackground()!=null);if(Build.VERSION.SDK_INT>=33){eq(true,adaptive.getMonochrome()!=null);android.graphics.drawable.Drawable mono=adaptive.getMonochrome();android.graphics.drawable.AdaptiveIconDrawable themed=new android.graphics.drawable.AdaptiveIconDrawable(new android.graphics.drawable.ColorDrawable(0xFFE2ECD9),mono);mono.setTint(0xFF28472D);iconBitmap(themed,"icon-b-native-themed",432);}
         iconBitmap(pm.getApplicationIcon(ctx.getPackageName()),"icon-b-native",432);iconBitmap(pm.getApplicationIcon(ctx.getPackageName()),"icon-b-native-48",48);eq(true,pm.getApplicationInfo(ctx.getPackageName(),0).icon!=0);
     }
     void runUpgradeChecks()throws Exception {
         Context ctx=getTargetContext(); LedgerDb db=new LedgerDb(ctx);
         eq(6,db.all().size());eq(1975877L,Ledger.available(Ledger.totals(db.all())));db.close();
-        eq("0.6.1",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
+        eq("0.6.2",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
         eq(true,new CategoryStore(ctx).choices("지출",Collections.emptyList()).contains("반려동물 병원"));
         AppPreferences prefs=new AppPreferences(ctx);eq(5,prefs.startTab());eq("gothic",prefs.fontId());eq(false,prefs.dark());eq(true,prefs.homeMetrics().contains("today_2"));
     }
@@ -104,7 +104,26 @@ public class DeviceChecks extends Instrumentation {
         historyUiChecks();
         overlayUiChecks();
         entryWorkflowUiChecks();
+        settingsHeaderChecks();
         runOnMainSync(()->a.finish());waitForIdleSync();
+    }
+    /** 0.6.2: 모든 화면의 상단 설정·메뉴 버튼이 같은 크기(48dp 정사각형)와 같은 위치를 쓰는지 확인. */
+    void settingsHeaderChecks()throws Exception{
+        Context ctx=getTargetContext();MainActivity app=(MainActivity)startActivitySync(new Intent(ctx,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
+        int touch=Math.round(48*app.getResources().getDisplayMetrics().density);android.graphics.Rect gearRef=null,menuRef=null;
+        for(int tab:new int[]{2,4,5,0,1,3}){
+            navigate(app,tab);View root=app.getWindow().getDecorView();eq(1,countDesc(root,"설정 열기"));
+            android.graphics.Rect gear=screenRect(findDesc(root,"설정 열기"));eq(touch,gear.width());eq(touch,gear.height());
+            if(gearRef==null)gearRef=gear;else{eq(gearRef.right,gear.right);eq(gearRef.top,gear.top);}
+            if(tab!=0){android.graphics.Rect menu=screenRect(findDesc(root,"메뉴 열기"));eq(touch,menu.width());eq(touch,menu.height());eq(gear.top,menu.top);if(menuRef==null)menuRef=menu;else eq(menuRef.left,menu.left);}
+            screenshot(ctx,"header-tab"+tab+"-"+app.getResources().getConfiguration().fontScale);
+        }
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"설정 열기").performClick());waitForIdleSync();View root=app.getWindow().getDecorView();
+        eq(6,fieldValue(app,"tab"));eq(0,countDesc(root,"설정 열기"));android.graphics.Rect back=screenRect(findDesc(root,"설정 뒤로"));eq(touch,back.width());eq(menuRef.left,back.left);
+        TextView heading=(TextView)findText(root,"설정");int[] at=new int[2];runOnMainSync(()->heading.getLocationOnScreen(at));eq(true,Math.abs(at[0]+heading.getWidth()/2f-app.getResources().getDisplayMetrics().widthPixels/2f)<4);
+        screenshot(ctx,"header-settings-"+app.getResources().getConfiguration().fontScale);
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"설정 뒤로").performClick());waitForIdleSync();eq(3,fieldValue(app,"tab"));
+        runOnMainSync(()->app.finish());waitForIdleSync();
     }
     View windowDesc(String desc){List<View> roots=android.view.inspector.WindowInspector.getGlobalWindowViews();for(int i=roots.size()-1;i>=0;i--){View found=findDesc(roots.get(i),desc);if(found!=null)return found;}throw new AssertionError("No view: "+desc);}
     void enterAmount(String digits,String type)throws Exception{runOnMainSync(()->windowDesc(type+" 새 기록 구분").performClick());clickText("전체 지우기");for(char digit:digits.toCharArray())runOnMainSync(()->windowDesc("키패드 "+digit).performClick());clickText("적용");waitForIdleSync();}
