@@ -19,13 +19,14 @@ public class DeviceChecks extends Instrumentation {
     @Override public void onCreate(Bundle args){super.onCreate(args);mode=args==null?"":args.getString("mode","");start();}
     @Override public void onStart(){
         Bundle out=new Bundle();
-        try{if("upgrade".equals(mode))runUpgradeChecks();else runChecks();out.putString("result","PASS: "+checks+" Android integration checks");finish(Activity.RESULT_OK,out);}
+        try{if("upgrade".equals(mode))runUpgradeChecks();else if("preview".equals(mode))statisticsPreview();else runChecks();out.putString("result","PASS: "+checks+" Android integration checks");finish(Activity.RESULT_OK,out);}
         catch(Throwable e){StringWriter sw=new StringWriter();e.printStackTrace(new PrintWriter(sw));out.putString("error",sw.toString());finish(Activity.RESULT_CANCELED,out);}
     }
     void runUpgradeChecks()throws Exception {
         Context ctx=getTargetContext(); LedgerDb db=new LedgerDb(ctx);
-        eq(3,db.all().size());eq(1987500L,Ledger.available(Ledger.totals(db.all())));db.close();
-        eq("0.1.2",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
+        eq(5,db.all().size());eq(1976000L,Ledger.available(Ledger.totals(db.all())));db.close();
+        eq("0.2.0",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
+        eq(true,new CategoryStore(ctx).choices("지출",Collections.emptyList()).contains("반려동물 병원"));
     }
     void runChecks()throws Exception {
         Context ctx=getTargetContext();ctx.deleteDatabase("chagok.db");LedgerDb db=new LedgerDb(ctx);
@@ -47,7 +48,8 @@ public class DeviceChecks extends Instrumentation {
         try {categories.remember("저축","   ");throw new AssertionError("Blank category accepted");}catch(IllegalArgumentException expected){checks++;}
         try {categories.remember("저축",String.join("",Collections.nCopies(41,"가")));throw new AssertionError("Long category accepted");}catch(IllegalArgumentException expected){checks++;}
         Activity a=startActivitySync(new Intent(ctx,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
-        runOnMainSync(()->{try{set(a,"month",YearMonth.of(2026,10));set(a,"selected",LocalDate.of(2026,10,27));invoke(a,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
+        eq(true,findDesc(a.getWindow().getDecorView(),"통계 탭").isSelected());eq(true,findDesc(a.getWindow().getDecorView(),"지출 통계").isSelected());
+        runOnMainSync(()->{try{set(a,"tab",0);set(a,"month",YearMonth.of(2026,10));set(a,"selected",LocalDate.of(2026,10,27));invoke(a,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
         eq(true,findText(a.getWindow().getDecorView(),"1,987,500원")!=null);
         screenshot(ctx,"calendar");
         runOnMainSync(()->findDesc(a.getWindow().getDecorView(),"수입, 지출, 저축 기록 추가").performClick());waitForIdleSync();Thread.sleep(350);
@@ -80,7 +82,42 @@ public class DeviceChecks extends Instrumentation {
         verify=new LedgerDb(ctx);eq(3,verify.all().size());verify.close();
         categoryUiChecks(app);
         calendarUiChecks(app);
+        statisticsUiChecks(app);
         runOnMainSync(()->a.finish());waitForIdleSync();
+    }
+    void statisticsUiChecks(MainActivity app)throws Exception {
+        runOnMainSync(()->{try{set(app,"month",YearMonth.of(2026,10));set(app,"statisticsType",1);set(app,"tab",2);invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
+        eq(true,findDesc(app.getWindow().getDecorView(),"지출 분류별 원형 차트, 합계 17,000원, 2개 분류")!=null);
+        eq(true,findDesc(app.getWindow().getDecorView(),"10월 지출 합계 17,000원")!=null);
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"수입 통계").performClick());waitForIdleSync();
+        eq(true,findDesc(app.getWindow().getDecorView(),"수입 분류별 원형 차트, 합계 3,000,000원, 1개 분류")!=null);
+        eq(true,findDesc(app.getWindow().getDecorView(),"10월 수입 합계 3,000,000원")!=null);screenshot(getTargetContext(),"stats-single");
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"저축 통계").performClick());waitForIdleSync();
+        eq(true,findDesc(app.getWindow().getDecorView(),"저축 분류별 원형 차트, 합계 1,000,000원, 1개 분류")!=null);
+        Bundle saved=new Bundle();runOnMainSync(()->app.onSaveInstanceState(saved));eq(2,saved.getInt("tab"));eq(2,saved.getInt("statisticsType"));
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"이전 달").performClick());waitForIdleSync();
+        eq(true,findDesc(app.getWindow().getDecorView(),"저축 분류별 원형 차트, 합계 7,000원, 1개 분류")!=null);
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"이전 달").performClick());waitForIdleSync();
+        eq(true,findDesc(app.getWindow().getDecorView(),"저축 분류별 원형 차트, 합계 0원, 0개 분류")!=null);
+        eq(true,findText(app.getWindow().getDecorView(),"아직 저축 기록이 없어요.")!=null);screenshot(getTargetContext(),"stats-empty");
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"수입, 지출, 저축 기록 추가").performClick());waitForIdleSync();Thread.sleep(200);
+        List<AccessibilityNodeInfo> edits=new ArrayList<>();collectEdits(getUiAutomation().getRootInActiveWindow(),edits);setText(edits.get(0),"123");setText(edits.get(2),"통계 탭 저축 테스트");clickText("저장");waitForIdleSync();Thread.sleep(200);
+        LedgerDb db=new LedgerDb(getTargetContext());eq(true,db.all().stream().anyMatch(e->e.date.equals("2026-08-01") && e.type.equals("저축") && e.amount==123));db.close();
+        eq(true,findDesc(app.getWindow().getDecorView(),"저축 분류별 원형 차트, 합계 123원, 1개 분류")!=null);
+    }
+    void statisticsPreview()throws Exception {
+        Thread.sleep(5000);
+        Context ctx=getTargetContext();ctx.deleteDatabase("chagok.db");LedgerDb db=new LedgerDb(ctx);
+        String[] names={"용돈","여행","옷","회사식비","데이트","친구 만남","선물","교통비","책·교육","편의점","이름이 긴 분류도 목록에서 자세하게 확인할 수 있어요"};
+        long[] amounts={500000,377500,345800,251600,238550,168200,83000,49000,33600,24900,2000};
+        List<Ledger.Entry> seed=new ArrayList<>();for(int i=0;i<names.length;i++)seed.add(new Ledger.Entry("preview-expense-"+i,"2026-10-27","지출",amounts[i],names[i],"화면 확인용 예시",0));
+        seed.add(new Ledger.Entry("preview-i1","2026-10-01","수입",3000000,"월급","",0));seed.add(new Ledger.Entry("preview-i2","2026-10-15","수입",500000,"부수입","",0));seed.add(new Ledger.Entry("preview-i3","2026-10-20","수입",200000,"용돈","",0));
+        seed.add(new Ledger.Entry("preview-s1","2026-10-05","저축",1000000,"적금","",0));seed.add(new Ledger.Entry("preview-s2","2026-10-10","저축",500000,"청약","",0));seed.add(new Ledger.Entry("preview-s3","2026-10-15","저축",300000,"비상금","",0));db.importAtomic(seed);db.close();
+        Activity app=startActivitySync(new Intent(ctx,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
+        for(int type:new int[]{1,0,2}){
+            runOnMainSync(()->{try{set(app,"tab",2);set(app,"statisticsType",type);set(app,"month",YearMonth.of(2026,10));invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();screenshot(ctx,type==1?"stats-expense":type==0?"stats-income":"stats-saving");
+        }
+        runOnMainSync(()->app.finish());waitForIdleSync();
     }
     void calendarUiChecks(MainActivity app)throws Exception {
         runOnMainSync(()->{try{set(app,"tab",0);set(app,"month",YearMonth.of(2026,9));set(app,"selected",LocalDate.of(2026,9,1));invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();

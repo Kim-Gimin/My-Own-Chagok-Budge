@@ -21,6 +21,7 @@ import java.util.concurrent.*;
 public final class MainActivity extends Activity {
     private static final int BG=0xFFF7F8FA, INK=0xFF202A33, MUTED=0xFF78818A, GREEN=0xFF19765B, RED=0xFFD76862, PURPLE=0xFF8071BC, LINE=0xFFE8ECEF;
     private static final int[] COLORS={GREEN,RED,PURPLE};
+    private static final int PINK=0xFFED1761;
     private static final String MIME="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final int EXPORT=10, TEMPLATE=11, IMPORT=12, EXPORT_MONTH=13;
     private final ExecutorService io=Executors.newSingleThreadExecutor();
@@ -30,7 +31,7 @@ public final class MainActivity extends Activity {
     private List<Ledger.Entry> all=new ArrayList<>(), monthly=new ArrayList<>();
     private YearMonth month=YearMonth.now();
     private LocalDate selected=LocalDate.now();
-    private int tab, filter, displayLimit=100;
+    private int tab=2, statisticsType=1, filter, displayLimit=100;
     private String search="";
     private LinearLayout root,page,recordList;
     private AlertDialog progress;
@@ -44,7 +45,7 @@ public final class MainActivity extends Activity {
         if(state!=null) {
             month=YearMonth.parse(state.getString("month",month.toString()));
             selected=LocalDate.parse(state.getString("selected",selected.toString()));
-            tab=state.getInt("tab"); filter=state.getInt("filter"); search=state.getString("search","");
+            tab=state.containsKey("statisticsType")?state.getInt("tab",2):2; statisticsType=state.getInt("statisticsType",1); filter=state.getInt("filter"); search=state.getString("search","");
             String exportMonth=state.getString("exportMonth"); if(exportMonth!=null) pendingExportMonth=YearMonth.parse(exportMonth);
         }
         getWindow().setStatusBarColor(BG); getWindow().setNavigationBarColor(Color.WHITE);
@@ -53,7 +54,7 @@ public final class MainActivity extends Activity {
     }
     @Override public void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out); out.putString("month",month.toString()); out.putString("selected",selected.toString());
-        out.putInt("tab",tab); out.putInt("filter",filter); out.putString("search",search);
+        out.putInt("tab",tab); out.putInt("statisticsType",statisticsType); out.putInt("filter",filter); out.putString("search",search);
         if(pendingExportMonth!=null) out.putString("exportMonth",pendingExportMonth.toString());
     }
     @Override public void onDestroy() {
@@ -86,28 +87,37 @@ public final class MainActivity extends Activity {
     private void render() {
         if(isFinishing() || isDestroyed()) return;
         all=db.all(); monthly=Ledger.month(all,month);
-        root=column(); root.setBackgroundColor(BG);
+        boolean stats=tab==2;int surface=stats?Color.WHITE:BG;
+        root=column(); root.setBackgroundColor(surface);getWindow().setStatusBarColor(surface);
         root.setOnApplyWindowInsetsListener((v,insets)-> { v.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom()); return insets.consumeSystemWindowInsets(); });
         setContentView(root); root.requestApplyInsets();
-        LinearLayout header=row(); header.setPadding(dp(22),dp(18),dp(22),dp(12));
-        IconView mark=new IconView("stack",GREEN); header.addView(mark,new LinearLayout.LayoutParams(dp(28),dp(28)));
-        TextView title=text("차곡",25,INK,true); LinearLayout.LayoutParams tl=new LinearLayout.LayoutParams(0,-2,1); tl.leftMargin=dp(9); header.addView(title,tl);
-        TextView today=button("오늘",GREEN,false,()->{ month=YearMonth.now(); selected=LocalDate.now(); displayLimit=100; render(); }); today.setMinHeight(dp(38)); today.setPadding(dp(14),dp(10),dp(14),dp(10)); header.addView(today);
+        LinearLayout header=row();
+        if(stats){
+            header.setPadding(dp(15),dp(4),dp(15),dp(4));header.addView(new View(this),new LinearLayout.LayoutParams(dp(41),1));
+            TextView prev=text("‹",29,INK,false);prev.setGravity(Gravity.CENTER);prev.setContentDescription("이전 달");prev.setOnClickListener(v->moveMonth(-1));header.addView(prev,new LinearLayout.LayoutParams(dp(36),dp(36)));
+            TextView monthTitle=text(month.format(DateTimeFormatter.ofPattern("yyyy년 MM월")),20,INK,true);monthTitle.setSingleLine(true);monthTitle.setAutoSizeTextTypeUniformWithConfiguration(15,20,1,TypedValueCompat.SP);monthTitle.setGravity(Gravity.CENTER);monthTitle.setOnClickListener(v->pickMonth());header.addView(monthTitle,new LinearLayout.LayoutParams(0,dp(36),1));
+            TextView next=text("›",29,INK,false);next.setGravity(Gravity.CENTER);next.setContentDescription("다음 달");next.setOnClickListener(v->moveMonth(1));header.addView(next,new LinearLayout.LayoutParams(dp(36),dp(36)));
+        }else{
+            header.setPadding(dp(22),dp(18),dp(22),dp(12));
+            IconView mark=new IconView("stack",GREEN); header.addView(mark,new LinearLayout.LayoutParams(dp(28),dp(28)));
+            TextView title=text("차곡",25,INK,true); LinearLayout.LayoutParams tl=new LinearLayout.LayoutParams(0,-2,1); tl.leftMargin=dp(9); header.addView(title,tl);
+            TextView today=button("오늘",GREEN,false,()->{ month=YearMonth.now(); selected=LocalDate.now(); displayLimit=100; render(); }); today.setMinHeight(dp(38)); today.setPadding(dp(14),dp(10),dp(14),dp(10)); header.addView(today);
+        }
         root.addView(header);
         FrameLayout body=new FrameLayout(this); root.addView(body,new LinearLayout.LayoutParams(-1,0,1));
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false); body.addView(scroll,new FrameLayout.LayoutParams(-1,-1));
-        page=column(); page.setPadding(dp(20),dp(6),dp(20),dp(32)); scroll.addView(page);
-        if(tab!=3) { monthBar(); summary(); }
+        page=column(); page.setPadding(dp(stats?16:20),dp(stats?0:6),dp(stats?16:20),dp(32)); scroll.addView(page);
+        if(tab==0 || tab==1) { monthBar(); summary(); }
         if(tab==0) calendar(); else if(tab==1) records(); else if(tab==2) statistics(); else files();
-        TextView add=text("+",26,Color.WHITE,false); add.setGravity(Gravity.CENTER); add.setContentDescription("수입, 지출, 저축 기록 추가"); add.setBackground(bg(GREEN,14));
-        LinearLayout.LayoutParams addParams=new LinearLayout.LayoutParams(dp(42),dp(42)); addParams.leftMargin=dp(9); if(tab!=3) header.addView(add,addParams); add.setOnClickListener(v->edit(null));
+        TextView add=text("+",stats?24:26,stats?PINK:Color.WHITE,false); add.setGravity(Gravity.CENTER); add.setContentDescription("수입, 지출, 저축 기록 추가"); add.setBackground(bg(stats?0xFFFDECF2:GREEN,14));
+        LinearLayout.LayoutParams addParams=new LinearLayout.LayoutParams(dp(stats?32:42),dp(stats?32:42)); addParams.leftMargin=dp(9); if(tab!=3) header.addView(add,addParams); add.setOnClickListener(v->edit(null));
         line(root);
         LinearLayout nav=row(); nav.setPadding(dp(8),dp(8),dp(8),dp(8)); nav.setBackgroundColor(Color.WHITE);
-        String[] names={"달력","내역","통계","엑셀"}, icons={"calendar","list","chart","file"};
+        String[] names={"통계","달력","내역","엑셀"}, icons={"pie","calendar","list","file"};int[] targets={2,0,1,3};
         for(int i=0;i<4;i++) {
-            final int target=i; LinearLayout item=column(); item.setGravity(Gravity.CENTER); item.setPadding(0,dp(3),0,dp(3));
-            item.addView(new IconView(icons[i],tab==i?GREEN:MUTED),new LinearLayout.LayoutParams(dp(23),dp(23))); space(item,5);
-            TextView navLabel=text(names[i],11,tab==i?GREEN:MUTED,tab==i); navLabel.setGravity(Gravity.CENTER); item.addView(navLabel); item.setContentDescription(names[i]+" 탭");
+            final int target=targets[i];boolean active=tab==target;int tint=active?(target==2?PINK:GREEN):MUTED;LinearLayout item=column(); item.setGravity(Gravity.CENTER); item.setPadding(0,dp(3),0,dp(3));
+            item.addView(new IconView(icons[i],tint),new LinearLayout.LayoutParams(dp(23),dp(23))); space(item,5);
+            TextView navLabel=text(names[i],11,tint,active); navLabel.setGravity(Gravity.CENTER); item.addView(navLabel); item.setContentDescription(names[i]+" 탭");item.setSelected(active);
             item.setOnClickListener(v->{hideKeyboard(); tab=target; displayLimit=100; render();}); nav.addView(item,new LinearLayout.LayoutParams(0,dp(51),1));
         }
         root.addView(nav);
@@ -215,26 +225,42 @@ public final class MainActivity extends Activity {
         LinearLayout c=card(parent); c.setGravity(Gravity.CENTER); c.setPadding(dp(12),dp(28),dp(12),dp(28)); c.addView(text(title,15,INK,true)); space(c,10); TextView sub=label(subtitle,12,MUTED); sub.setGravity(Gravity.CENTER); c.addView(sub);
     }
     private void statistics() {
-        long[] t=Ledger.totals(monthly);
-        LinearLayout c=card(page); c.addView(text("이번 달 돈의 흐름",17,INK,true)); space(c,18);
-        long max=Math.max(1,Math.max(t[0],Math.max(t[1],t[2])));
-        for(int i=0;i<3;i++) { LinearLayout r=row(); r.addView(label(Ledger.TYPES[i],13,COLORS[i]),new LinearLayout.LayoutParams(0,-2,1)); r.addView(text(won(t[i]),14,INK,true)); c.addView(r); space(c,8); c.addView(new BarView(t[i]/(float)max,COLORS[i]),new LinearLayout.LayoutParams(-1,dp(9))); space(c,16); }
-        c.addView(label(t[0]>0?"수입 대비 저축률 "+String.format(Locale.KOREA,"%.1f%%",t[2]*100.0/t[0]):"수입을 기록하면 저축률을 볼 수 있어요.",12,MUTED));
-        categoryStats("지출","어디에 썼을까요",RED); categoryStats("저축","차곡차곡 모은 돈",PURPLE);
-        long[] lifetime=Ledger.totals(all); LinearLayout total=card(page); total.addView(text("전체 기간 합계",17,INK,true)); space(total,14);
-        for(int i=0;i<3;i++) { LinearLayout r=row(); r.addView(label(Ledger.TYPES[i],13,COLORS[i]),new LinearLayout.LayoutParams(0,-2,1)); r.addView(text(won(lifetime[i]),14,INK,true)); total.addView(r); space(total,10); }
-        TextView foot=label("사용 가능 "+won(Ledger.available(lifetime))+"\n저축은 지출 통계에 포함하지 않아요.",12,MUTED); foot.setLineSpacing(dp(6),1); total.addView(foot);
-    }
-    private void categoryStats(String type,String title,int color) {
-        Map<String,Long> groups=new HashMap<>(); long total=0;
-        for(Ledger.Entry e:monthly) if(e.type.equals(type)) { groups.put(e.category,groups.getOrDefault(e.category,0L)+e.amount); total+=e.amount; }
-        if(total==0) return;
-        LinearLayout c=card(page); c.addView(text(title,17,INK,true)); space(c,16);
-        List<Map.Entry<String,Long>> groupsList=new ArrayList<>(groups.entrySet()); groupsList.sort((a,b)->Long.compare(b.getValue(),a.getValue()));
-        for(int i=0;i<Math.min(10,groupsList.size());i++) {
-            Map.Entry<String,Long> g=groupsList.get(i); LinearLayout r=row(); TextView name=label(g.getKey(),13,INK); name.setSingleLine(true); name.setEllipsize(TextUtils.TruncateAt.END); r.addView(name,new LinearLayout.LayoutParams(0,-2,1)); r.addView(label(won(g.getValue())+"  "+Math.round(g.getValue()*100.0/total)+"%",12,MUTED)); c.addView(r); space(c,8); c.addView(new BarView(g.getValue()/(float)total,color),new LinearLayout.LayoutParams(-1,dp(7))); space(c,15);
+        LinearLayout typeTabs=row();
+        for(int type:new int[]{1,0,2}){
+            boolean active=statisticsType==type;LinearLayout item=column();item.setGravity(Gravity.CENTER);item.setPadding(0,dp(8),0,dp(4));
+            TextView name=text(Ledger.TYPES[type],16,active?INK:MUTED,active);name.setGravity(Gravity.CENTER);item.addView(name);space(item,7);
+            View underline=new View(this);underline.setBackgroundColor(active?PINK:Color.TRANSPARENT);item.addView(underline,new LinearLayout.LayoutParams(dp(44),dp(3)));
+            item.setContentDescription(Ledger.TYPES[type]+" 통계");item.setSelected(active);
+            item.setOnClickListener(v->{statisticsType=type;displayLimit=100;render();});typeTabs.addView(item,new LinearLayout.LayoutParams(0,dp(52),1));
         }
-        if(groupsList.size()>10) c.addView(label("금액이 큰 10개 분류를 표시해요.",11,MUTED));
+        page.addView(typeTabs);
+        StatisticsData.Summary data=StatisticsData.aggregate(monthly,Ledger.TYPES[statisticsType]);
+        TextView note=label(data.hasTinyCategory?"* 1% 미만인 분류가 있어요.":"",11,INK);note.setGravity(Gravity.CENTER_VERTICAL);page.addView(note,new LinearLayout.LayoutParams(-1,dp(22)));
+        page.addView(new DonutChartView(this,data),new LinearLayout.LayoutParams(-1,-2));
+        if(data.groupedCount>0){TextView grouped=label("차트의 ‘그 외 "+data.groupedCount+"개’는 아래 목록에서 각각 확인할 수 있어요.",11,MUTED);grouped.setLineSpacing(dp(3),1);page.addView(grouped);space(page,8);}
+        page.addView(label("기간: "+month.getMonthValue()+"월 1일 ~ "+month.getMonthValue()+"월 "+month.lengthOfMonth()+"일",11,MUTED));space(page,14);line(page);
+        statisticsAmountRow(page,month.getMonthValue()+"월 "+data.type+" 합계",data.total,-1,true);
+        for(int i=0;i<Math.min(data.categories.size(),displayLimit);i++){
+            StatisticsData.Category category=data.categories.get(i);
+            statisticsAmountRow(page,category.name,category.amount,DonutChartView.color(i),false);
+        }
+        if(data.categories.size()>displayLimit)page.addView(button("분류 100개 더 보기",PINK,false,()->{displayLimit+=100;render();}));
+        if(data.total==0){space(page,18);TextView empty=label("아직 "+data.type+" 기록이 없어요.",14,MUTED);empty.setGravity(Gravity.CENTER);page.addView(empty);space(page,14);page.addView(button(data.type+" 기록하기",PINK,true,()->edit(null)));}
+        long[] monthlyTotals=Ledger.totals(monthly);space(page,24);line(page);
+        statisticsAmountRow(page,"이번 달 사용 가능",Ledger.available(monthlyTotals),-1,false);
+        page.addView(label("수입 − 지출 − 저축",11,MUTED));space(page,8);
+        page.addView(label(monthlyTotals[0]>0?"수입 대비 저축률 "+String.format(Locale.KOREA,"%.1f%%",monthlyTotals[2]*100.0/monthlyTotals[0]):"수입을 기록하면 저축률을 볼 수 있어요.",11,MUTED));space(page,24);line(page);space(page,18);
+        page.addView(text("전체 기간 합계",15,INK,true));
+        long[] lifetime=Ledger.totals(all);for(int i=0;i<3;i++)statisticsAmountRow(page,Ledger.TYPES[i],lifetime[i],COLORS[i],false);
+        statisticsAmountRow(page,"사용 가능",Ledger.available(lifetime),-1,false);
+        TextView foot=label("저축은 지출 통계에 포함하지 않아요.",11,MUTED);page.addView(foot);
+    }
+    private void statisticsAmountRow(LinearLayout parent,String name,long amount,int color,boolean total){
+        LinearLayout r=row();r.setPadding(0,dp(12),0,dp(12));
+        if(color!=-1){View marker=new View(this);marker.setBackgroundColor(color);LinearLayout.LayoutParams mp=new LinearLayout.LayoutParams(dp(3),dp(19));mp.rightMargin=dp(8);r.addView(marker,mp);}
+        TextView label=text(name,total?15:14,INK,total);label.setMaxLines(3);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.rightMargin=dp(9);r.addView(label,lp);
+        TextView price=text(won(amount),total?16:15,INK,true);price.setSingleLine(true);price.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);price.setAutoSizeTextTypeUniformWithConfiguration(10,total?16:15,1,TypedValueCompat.SP);r.addView(price,new LinearLayout.LayoutParams(dp(145),dp(24)));
+        r.setContentDescription(name+" "+won(amount));parent.addView(r);if(total)line(parent);
     }
     private void files() {
         space(page,12); page.addView(text("엑셀로 간편하게",25,INK,true)); space(page,10); TextView sub=label("기록은 안전하게 보관하고,\n여러 내역은 한 번에 입력하세요.",14,MUTED); sub.setLineSpacing(dp(5),1); page.addView(sub); space(page,24);
@@ -242,7 +268,7 @@ public final class MainActivity extends Activity {
         LinearLayout input=card(page); input.addView(text("엑셀 한 번에 가져오기",18,INK,true)); space(input,8); TextView desc=label("입력 양식에 내역을 적어 가져오세요.\n저장 전에 오류와 중복을 확인할 수 있어요.",13,MUTED); desc.setLineSpacing(dp(5),1); input.addView(desc); space(input,18); input.addView(button("엑셀 파일 가져오기",GREEN,true,this::chooseImport)); space(input,10); input.addView(button("빈 입력 양식 내려받기",GREEN,false,()->chooseExport(TEMPLATE)));
         LinearLayout info=card(page); info.addView(text("알아두세요",14,INK,true)); space(info,12);
         TextView note=label("• .xlsx 파일을 지원해요. 한 번에 최대 10,000건을 가져와요.\n\n• 백업 파일의 고유ID가 같으면 중복을 건너뛰어요. ID가 없으면 날짜·구분·금액·분류·메모를 비교해요.\n\n• 오류나 ID 충돌이 있으면 전체를 추가하지 않아요. 기존 내역은 지우지 않아요.\n\n• 기록은 이 휴대폰에만 저장돼요. 앱을 삭제하면 기록도 삭제되니, 백업 파일을 따로 보관하세요.",12,MUTED); note.setLineSpacing(dp(4),1); info.addView(note);
-        TextView version=label("차곡가계부 0.1.2  ·  로그인 없이, 광고 없이",11,MUTED); version.setGravity(Gravity.CENTER); page.addView(version);
+        TextView version=label("차곡가계부 0.2.0  ·  로그인 없이, 광고 없이",11,MUTED); version.setGravity(Gravity.CENTER); page.addView(version);
     }
     private EditText field(LinearLayout parent,String title,String value,int inputType) {
         parent.addView(text(title,12,MUTED,true)); space(parent,7); EditText edit=new EditText(this); edit.setTextSize(15); edit.setTextColor(INK); edit.setPadding(dp(12),dp(10),dp(12),dp(10)); edit.setBackground(bg(0xFFF3F5F6,10)); edit.setInputType(inputType); edit.setText(value); parent.addView(edit,new LinearLayout.LayoutParams(-1,dp(47))); space(parent,15); return edit;
@@ -251,7 +277,7 @@ public final class MainActivity extends Activity {
         if(busy) return;
         boolean updating=entry!=null;
         LinearLayout form=column(); form.setPadding(dp(22),dp(10),dp(22),dp(15));
-        LinearLayout switches=row(); final String[] chosen={updating?entry.type:"지출"}; final TextView[] tabs=new TextView[3];
+        LinearLayout switches=row(); final String[] chosen={updating?entry.type:(tab==2?Ledger.TYPES[statisticsType]:"지출")}; final TextView[] tabs=new TextView[3];
         Runnable updateTabs=()->{for(int i=0;i<3;i++){boolean on=Ledger.TYPES[i].equals(chosen[0]);tabs[i].setTextColor(on?Color.WHITE:COLORS[i]);tabs[i].setBackground(bg(on?COLORS[i]:0xFFF2F4F5,10));}};
         for(int i=0;i<3;i++) { final int index=i; TextView t=text(Ledger.TYPES[i],14,COLORS[i],true); t.setGravity(Gravity.CENTER); tabs[i]=t; LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(43),1); if(i>0)p.leftMargin=dp(7); switches.addView(t,p); t.setOnClickListener(v->{chosen[0]=Ledger.TYPES[index];updateTabs.run();}); }
         updateTabs.run(); form.addView(switches); space(form,20);
@@ -380,18 +406,13 @@ public final class MainActivity extends Activity {
     private void toast(String value) { Toast.makeText(this,value,Toast.LENGTH_SHORT).show(); }
     private void error(String title,String value) { if(!isFinishing() && !isDestroyed())new AlertDialog.Builder(this).setTitle(title).setMessage(value).setPositiveButton("확인",null).show(); }
     private static final class TypedValueCompat { static final int SP=2; }
-    private final class BarView extends View {
-        final float ratio; final int color; final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
-        BarView(float ratio,int color){super(MainActivity.this);this.ratio=Math.max(0,Math.min(1,ratio));this.color=color;}
-        @Override protected void onDraw(Canvas canvas){float h=getHeight();paint.setColor(0xFFF0F2F4);canvas.drawRoundRect(0,0,getWidth(),h,h/2,h/2,paint);paint.setColor(color);canvas.drawRoundRect(0,0,getWidth()*ratio,h,h/2,h/2,paint);}
-    }
     private final class IconView extends View {
         final String kind;final int color;final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
         IconView(String kind,int color){super(MainActivity.this);this.kind=kind;this.color=color;}
         @Override protected void onDraw(Canvas raw){raw.save();raw.scale(getWidth()/24f,getHeight()/24f);p.setColor(color);p.setStrokeWidth(1.8f);p.setStyle(Paint.Style.STROKE);p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeJoin(Paint.Join.ROUND);
             if(kind.equals("calendar")){raw.drawRoundRect(3,5,21,22,3,3,p);raw.drawLine(3,10,21,10,p);raw.drawLine(8,2,8,7,p);raw.drawLine(16,2,16,7,p);p.setStyle(Paint.Style.FILL);raw.drawCircle(8,15,1,p);raw.drawCircle(13,15,1,p);raw.drawCircle(8,19,1,p);}
             else if(kind.equals("list")){for(int y=5;y<=19;y+=7){raw.drawLine(8,y,21,y,p);raw.drawCircle(3,y,.7f,p);}}
-            else if(kind.equals("chart")){raw.drawLine(3,22,22,22,p);raw.drawRoundRect(4,13,7,21,1,1,p);raw.drawRoundRect(11,7,14,21,1,1,p);raw.drawRoundRect(18,2,21,21,1,1,p);}
+            else if(kind.equals("pie")){p.setStyle(Paint.Style.FILL);raw.drawArc(new RectF(2,2,22,22),5,265,true,p);raw.drawArc(new RectF(2,2,22,22),277,78,true,p);p.setColor(Color.WHITE);raw.drawCircle(12,12,4.5f,p);}
             else if(kind.equals("file")){raw.drawRoundRect(5,2,20,22,2,2,p);raw.drawLine(9,8,16,8,p);raw.drawLine(9,12,16,12,p);raw.drawLine(9,16,14,16,p);}
             else {p.setStyle(Paint.Style.FILL);raw.drawRoundRect(1,3,23,7,1.5f,1.5f,p);raw.drawRoundRect(1,10,19,14,1.5f,1.5f,p);raw.drawRoundRect(1,17,15,21,1.5f,1.5f,p);}
             raw.restore();}

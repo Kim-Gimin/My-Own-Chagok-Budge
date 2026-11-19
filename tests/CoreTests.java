@@ -67,6 +67,18 @@ public final class CoreTests {
         result=roundtrip(many);eq(10000,result.entries.size());eq(0,result.invalidRows);eq(memo,result.entries.get(9999).memo);
         many.add(entry("extra","2026-10-27","수입",1));rejects(()->roundtrip(many));
         if(args.length>0){result=XlsxIO.read(Files.newInputStream(Paths.get(args[0])));eq(0,result.invalidRows);eq(3,result.entries.size());eq(3000000L,Ledger.totals(result.entries)[0]);eq(1000000L,Ledger.totals(result.entries)[2]);}
-        System.out.println("PASS: "+checks+" checks (including 10,000-row Korean XLSX roundtrip)");
+        StatisticsData.Summary stats=StatisticsData.aggregate(data,"지출");eq(500000L,stats.total);eq(1,stats.categories.size());eq(100.0,stats.percent(500000));
+        stats=StatisticsData.aggregate(Collections.emptyList(),"저축");eq(0L,stats.total);eq(0.0,stats.percent(0));eq(0,stats.chartCategories.size());
+        List<Ledger.Entry> statisticsInput=new ArrayList<>();
+        statisticsInput.add(new Ledger.Entry("a","2026-10-01","지출",500,"식비","",0));
+        statisticsInput.add(new Ledger.Entry("b","2026-10-01","지출",500,"식비","",0));
+        statisticsInput.add(new Ledger.Entry("c","2026-10-01","수입",9000,"월급","",0));
+        statisticsInput.add(new Ledger.Entry("d","2026-10-01","지출",1,"작은 분류","",0));
+        stats=StatisticsData.aggregate(statisticsInput,"지출");eq(1001L,stats.total);eq(2,stats.categories.size());eq("식비",stats.categories.get(0).name);eq(true,stats.hasTinyCategory);
+        for(int i=0;i<14;i++)statisticsInput.add(new Ledger.Entry("group"+i,"2026-10-01","지출",i+1,"분류"+i,"",0));
+        stats=StatisticsData.aggregate(statisticsInput,"지출");eq(16,stats.categories.size());eq(10,stats.chartCategories.size());eq(7,stats.groupedCount);
+        long chartTotal=0;for(StatisticsData.Category category:stats.chartCategories)chartTotal+=category.amount;eq(stats.total,chartTotal);
+        eq(9000L,StatisticsData.aggregate(statisticsInput,"수입").total);
+        System.out.println("PASS: "+checks+" checks (including 10,000-row Korean XLSX roundtrip and category statistics)");
     }
 }
