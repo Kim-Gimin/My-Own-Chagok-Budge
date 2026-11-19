@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 final class UserGuideChecks {
     static final String[] TITLES={"1. 처음 시작하기·기록 입력","2. 수입·지출·저축·투자·저축회수","3. 기초자산·현재 보유","4. 저축 해지·배분 사용하기","5. 가상 적금 해지 예시","6. 엑셀로 한 번에 입력하기","7. 백업·복원·기기 변경","8. 내역·통계·결산 보기","9. 예산·목표·반복·즐겨찾기","10. 분류·화면·글꼴·잠금 설정"};
     static void baseline(DeviceChecks t)throws Exception {
-        Context ctx=t.getTargetContext();t.eq("0.8.9",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
+        Context ctx=t.getTargetContext();t.eq("0.8.10",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
         // Rich synthetic fixture already covers rowids, V1/V2, opening, planning and preferences.
         try(LedgerDb db=AssetGuardChecks.fresh(ctx)){
             ctx.getSharedPreferences("app_preferences",0).edit().clear().commit();ctx.getSharedPreferences("category_choices",0).edit().clear().commit();
@@ -36,8 +36,8 @@ final class UserGuideChecks {
         }
         try(LedgerDb db=new LedgerDb(ctx)){CategoryMigration.run(ctx,db);}
         t.eq(before,AssetGuardChecks.snapshot(t));
-        t.eq("0.8.10",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
-        t.eq(24,ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionCode);
+        t.eq("0.8.11",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
+        t.eq(25,ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionCode);
         try(LedgerDb db=new LedgerDb(ctx)){t.eq(4,db.getReadableDatabase().getVersion());t.eq(1,db.movements().size());t.eq(1,db.openingAssets().size());t.eq(1,db.planning().favorites.size());t.eq(true,db.planning().hasLivingFilter());t.eq(2,db.planning().livingCategories().size());}
     }
     static Object get(Object obj,String key)throws Exception{Field f=MainActivity.class.getDeclaredField(key);f.setAccessible(true);return f.get(obj);}

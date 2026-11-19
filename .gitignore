@@ -42,3 +42,7 @@ node_modules/
 local.properties
 secrets.properties
 keystore.properties
+
+!templates/chagok-input-0.8.11.xlsx
+*.bundle
+*.fastimport
