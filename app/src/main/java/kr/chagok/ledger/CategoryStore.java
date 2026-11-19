@@ -20,15 +20,24 @@ final class CategoryStore {
         TreeSet<String> used=new TreeSet<>();
         for(Ledger.Entry entry:entries) if(entry.type.equals(kind)) used.add(entry.category);
         names.addAll(used);
+        names.removeAll(prefs.getStringSet("deleted_"+kind,Collections.emptySet()));
         return new ArrayList<>(names);
     }
     boolean remember(String type,String name) {
         String kind=Ledger.normalizeType(type), cleaned=validate(name);
         Set<String> names=new HashSet<>(prefs.getStringSet(kind,Collections.emptySet()));
-        if(Arrays.asList(DEFAULTS[Ledger.index(kind)]).contains(cleaned) || !names.add(cleaned)) return false;
-        if(!prefs.edit().putStringSet(kind,names).commit()) throw new IllegalStateException("분류를 저장하지 못했어요. 다시 시도해 주세요.");
+        Set<String> deleted=new HashSet<>(prefs.getStringSet("deleted_"+kind,Collections.emptySet()));
+        boolean restored=deleted.remove(cleaned),added=!Arrays.asList(DEFAULTS[Ledger.index(kind)]).contains(cleaned)&&names.add(cleaned);
+        if(!restored&&!added)return false;
+        if(!prefs.edit().putStringSet(kind,names).putStringSet("deleted_"+kind,deleted).commit()) throw new IllegalStateException("분류를 저장하지 못했어요. 다시 시도해 주세요.");
         return true;
     }
+    boolean delete(String type,String name){
+        String kind=Ledger.normalizeType(type),cleaned=validate(name);Set<String> names=new HashSet<>(prefs.getStringSet(kind,Collections.emptySet())),deleted=new HashSet<>(prefs.getStringSet("deleted_"+kind,Collections.emptySet()));
+        boolean changed=deleted.add(cleaned),removed=names.remove(cleaned);if(!changed&&!removed)return false;
+        if(!prefs.edit().putStringSet(kind,names).putStringSet("deleted_"+kind,deleted).commit())throw new IllegalStateException("분류를 삭제하지 못했어요. 다시 시도해 주세요.");return true;
+    }
+    List<String> deleted(String type){return new ArrayList<>(new TreeSet<>(prefs.getStringSet("deleted_"+Ledger.normalizeType(type),Collections.emptySet())));}
     private static String validate(String name) {
         String value=name==null?"":name.trim();
         if(value.isEmpty()) throw new IllegalArgumentException("분류 이름을 입력해 주세요.");
