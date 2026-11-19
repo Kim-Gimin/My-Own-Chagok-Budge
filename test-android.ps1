@@ -18,8 +18,9 @@ Run-Checked "$BuildTools\aapt2.exe" @('link','-o',"$taskOut\tests\unsigned.apk",
 Run-Checked "$Jdk\bin\jar.exe" @('--update','--file',"$taskOut\tests\unsigned.apk",'-C',"$taskOut\tests\dex",'classes.dex')
 Run-Checked "$BuildTools\zipalign.exe" @('-f','-p','4',"$taskOut\tests\unsigned.apk","$taskOut\tests\aligned.apk")
 Run-Checked "$Jdk\bin\java.exe" @('-jar',"$BuildTools\lib\apksigner.jar",'sign','--ks',"$PSScriptRoot\local-test.keystore",'--ks-pass','pass:android','--key-pass','pass:android','--ks-key-alias','chagok-local','--out',"$taskOut\tests\tests.apk","$taskOut\tests\aligned.apk")
-Run-Checked $Adb @('-s',$Serial,'install','-r',"$taskOut\app\chagok-0.1.0.apk")
+$taskApk=(Get-ChildItem -LiteralPath "$taskOut\app" -Filter 'chagok-*.apk' | Select-Object -First 1).FullName
+Run-Checked $Adb @('-s',$Serial,'install','-r',$taskApk)
 Run-Checked $Adb @('-s',$Serial,'install','-r',"$taskOut\tests\tests.apk")
 $taskResult=& $Adb -s $Serial shell am instrument -w kr.chagok.ledger.tests/kr.chagok.ledger.DeviceChecks
 $taskResult
-if(($taskResult -join "`n") -notmatch 'PASS: 35 Android integration checks'){throw 'Android integration tests failed'}
+if(($taskResult -join "`n") -notmatch 'PASS: \d+ Android integration checks'){throw 'Android integration tests failed'}

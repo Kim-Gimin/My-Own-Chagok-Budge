@@ -26,6 +26,7 @@ public final class MainActivity extends Activity {
     private final ExecutorService io=Executors.newSingleThreadExecutor();
     private final NumberFormat number=NumberFormat.getIntegerInstance(Locale.KOREA);
     private LedgerDb db;
+    private CategoryStore categories;
     private List<Ledger.Entry> all=new ArrayList<>(), monthly=new ArrayList<>();
     private YearMonth month=YearMonth.now();
     private LocalDate selected=LocalDate.now();
@@ -39,6 +40,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         db=new LedgerDb(this);
+        categories=new CategoryStore(this);
         if(state!=null) {
             month=YearMonth.parse(state.getString("month",month.toString()));
             selected=LocalDate.parse(state.getString("selected",selected.toString()));
@@ -240,7 +242,7 @@ public final class MainActivity extends Activity {
         LinearLayout input=card(page); input.addView(text("엑셀 한 번에 가져오기",18,INK,true)); space(input,8); TextView desc=label("입력 양식에 내역을 적어 가져오세요.\n저장 전에 오류와 중복을 확인할 수 있어요.",13,MUTED); desc.setLineSpacing(dp(5),1); input.addView(desc); space(input,18); input.addView(button("엑셀 파일 가져오기",GREEN,true,this::chooseImport)); space(input,10); input.addView(button("빈 입력 양식 내려받기",GREEN,false,()->chooseExport(TEMPLATE)));
         LinearLayout info=card(page); info.addView(text("알아두세요",14,INK,true)); space(info,12);
         TextView note=label("• .xlsx 파일을 지원해요. 한 번에 최대 10,000건을 가져와요.\n\n• 백업 파일의 고유ID가 같으면 중복을 건너뛰어요. ID가 없으면 날짜·구분·금액·분류·메모를 비교해요.\n\n• 오류나 ID 충돌이 있으면 전체를 추가하지 않아요. 기존 내역은 지우지 않아요.\n\n• 기록은 이 휴대폰에만 저장돼요. 앱을 삭제하면 기록도 삭제되니, 백업 파일을 따로 보관하세요.",12,MUTED); note.setLineSpacing(dp(4),1); info.addView(note);
-        TextView version=label("차곡가계부 0.1.0  ·  로그인 없이, 광고 없이",11,MUTED); version.setGravity(Gravity.CENTER); page.addView(version);
+        TextView version=label("차곡가계부 0.1.1  ·  로그인 없이, 광고 없이",11,MUTED); version.setGravity(Gravity.CENTER); page.addView(version);
     }
     private EditText field(LinearLayout parent,String title,String value,int inputType) {
         parent.addView(text(title,12,MUTED,true)); space(parent,7); EditText edit=new EditText(this); edit.setTextSize(15); edit.setTextColor(INK); edit.setPadding(dp(12),dp(10),dp(12),dp(10)); edit.setBackground(bg(0xFFF3F5F6,10)); edit.setInputType(inputType); edit.setText(value); parent.addView(edit,new LinearLayout.LayoutParams(-1,dp(47))); space(parent,15); return edit;
@@ -258,7 +260,12 @@ public final class MainActivity extends Activity {
         EditText date=field(form,"날짜",defaultDate.toString(),android.text.InputType.TYPE_CLASS_TEXT); date.setFocusable(false); date.setContentDescription("날짜 선택");
         date.setOnClickListener(v->{LocalDate d=LocalDate.parse(date.getText().toString()); DatePickerDialog picker=new DatePickerDialog(this,(p,y,m,day)->date.setText(LocalDate.of(y,m+1,day).toString()),d.getYear(),d.getMonthValue()-1,d.getDayOfMonth());picker.show();});
         EditText category=field(form,"분류",updating?entry.category:"",android.text.InputType.TYPE_CLASS_TEXT); category.setHint("예: 식비, 월급, 적금"); category.setSingleLine(true); category.setFilters(new InputFilter[]{new InputFilter.LengthFilter(40)});
-        LinearLayout quick=row(); String[] cats={"식비","교통","생활","월급","적금"}; for(String cat:cats){TextView t=text(cat,11,MUTED,false);t.setPadding(dp(8),dp(6),dp(8),dp(6));t.setOnClickListener(v->category.setText(cat));quick.addView(t);} form.addView(quick); space(form,13);
+        LinearLayout categoryActions=row();
+        TextView choose=button("분류 선택",GREEN,false,()->chooseCategory(chosen[0],category));
+        TextView add=button("+ 분류 추가",GREEN,false,()->addCategory(chosen[0],category));
+        categoryActions.addView(choose,new LinearLayout.LayoutParams(0,dp(43),1));
+        LinearLayout.LayoutParams addCategoryParams=new LinearLayout.LayoutParams(0,dp(43),1); addCategoryParams.leftMargin=dp(8); categoryActions.addView(add,addCategoryParams);
+        form.addView(categoryActions); space(form,15);
         EditText memo=field(form,"메모 (선택)",updating?entry.memo:"",android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE); memo.setHint("어떤 기록인가요?"); memo.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});
         TextView hint=label("저축은 사용 가능 금액에서 차감돼요.",11,MUTED); form.addView(hint);
         ScrollView scroll=new ScrollView(this); scroll.addView(form);
@@ -274,6 +281,34 @@ public final class MainActivity extends Activity {
             if(updating) dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->new AlertDialog.Builder(this).setTitle("이 기록을 삭제할까요?").setMessage(entry.category+"  "+won(entry.amount)).setNegativeButton("취소",null).setPositiveButton("삭제",(a,b)->{db.delete(entry.id);dialog.dismiss();render();toast("삭제했어요.");}).show());
         });
         dialog.show(); dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+    }
+    private void chooseCategory(String type,EditText category) {
+        hideKeyboard();
+        List<String> choices=categories.choices(type,db.all());
+        String current=category.getText().toString().trim();
+        if(!current.isEmpty() && !choices.contains(current)) choices.add(0,current);
+        new AlertDialog.Builder(this).setTitle(type+" 분류 선택")
+            .setItems(choices.toArray(new String[0]),(d,index)->category.setText(choices.get(index)))
+            .setNegativeButton("취소",null)
+            .setPositiveButton("새 분류 추가",(d,w)->addCategory(type,category)).show();
+    }
+    private void addCategory(String type,EditText category) {
+        LinearLayout form=column(); form.setPadding(dp(22),dp(12),dp(22),dp(6));
+        EditText name=field(form,"분류 이름","",android.text.InputType.TYPE_CLASS_TEXT);
+        name.setSingleLine(true); name.setHint("예: 반려동물, 보험, 운동");
+        name.setFilters(new InputFilter[]{new InputFilter.LengthFilter(40)});
+        TextView note=label(type+" 분류에 저장하고 다음에도 선택할 수 있어요.",12,MUTED); form.addView(note);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(type+" 분류 추가").setView(form)
+            .setNegativeButton("취소",null).setPositiveButton("추가",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+            try {
+                boolean added=categories.remember(type,name.getText().toString());
+                category.setText(name.getText().toString().trim());
+                ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(name.getWindowToken(),0);
+                dialog.dismiss(); if(!added) toast("이미 있는 분류를 선택했어요.");
+            } catch(Exception ex) { name.setError(ex.getMessage()); }
+        }));
+        dialog.show();
     }
     private void chooseExport(int mode) {
         if(busy) return;

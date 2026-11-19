@@ -14,15 +14,22 @@ import java.util.*;
 
 public class DeviceChecks extends Instrumentation {
     int checks;
+    String mode;
     void eq(Object a,Object b){checks++;if(!Objects.equals(a,b))throw new AssertionError("Expected "+a+", actual "+b);}
-    @Override public void onCreate(Bundle args){super.onCreate(args);start();}
+    @Override public void onCreate(Bundle args){super.onCreate(args);mode=args==null?"":args.getString("mode","");start();}
     @Override public void onStart(){
         Bundle out=new Bundle();
-        try{runChecks();out.putString("result","PASS: "+checks+" Android integration checks");finish(Activity.RESULT_OK,out);}
+        try{if("upgrade".equals(mode))runUpgradeChecks();else runChecks();out.putString("result","PASS: "+checks+" Android integration checks");finish(Activity.RESULT_OK,out);}
         catch(Throwable e){StringWriter sw=new StringWriter();e.printStackTrace(new PrintWriter(sw));out.putString("error",sw.toString());finish(Activity.RESULT_CANCELED,out);}
+    }
+    void runUpgradeChecks()throws Exception {
+        Context ctx=getTargetContext(); LedgerDb db=new LedgerDb(ctx);
+        eq(3,db.all().size());eq(1987500L,Ledger.available(Ledger.totals(db.all())));db.close();
+        eq("0.1.1",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
     }
     void runChecks()throws Exception {
         Context ctx=getTargetContext();ctx.deleteDatabase("chagok.db");LedgerDb db=new LedgerDb(ctx);
+        ctx.getSharedPreferences("category_choices",Context.MODE_PRIVATE).edit().clear().commit();
         List<Ledger.Entry> seed=Arrays.asList(new Ledger.Entry("i","2026-10-01","수입",3000000,"월급","10월 급여",2),new Ledger.Entry("e","2026-10-27","지출",12500,"식비","점심 식사",3),new Ledger.Entry("s","2026-10-05","저축",1000000,"적금","차곡차곡 모으기",4));
         Ledger.ImportPlan p=db.importAtomic(seed);eq(3,p.additions.size());eq(3,db.all().size());
         p=db.importAtomic(seed);eq(3,p.duplicates);eq(3,db.all().size());
@@ -31,6 +38,14 @@ public class DeviceChecks extends Instrumentation {
         ByteArrayOutputStream bytes=new ByteArrayOutputStream();XlsxIO.write(bytes,db.all(),false);XlsxIO.ReadResult r=XlsxIO.read(new ByteArrayInputStream(bytes.toByteArray()));eq(3,r.entries.size());eq(0,r.invalidRows);eq(1987500L,Ledger.available(Ledger.totals(r.entries)));
         try(InputStream sample=getContext().getAssets().open("example.xlsx")){r=XlsxIO.read(sample);eq(3,r.entries.size());eq(0,r.invalidRows);eq(1000000L,Ledger.totals(r.entries)[2]);}
         db.close();db=new LedgerDb(ctx);eq(3,db.all().size());db.close();
+        CategoryStore categories=new CategoryStore(ctx);
+        eq(true,categories.choices("지출",seed).contains("의료·건강"));eq(true,categories.choices("수입",seed).contains("부수입"));
+        eq(true,categories.remember("지출","  반려동물  "));eq(false,categories.remember("지출","반려동물"));
+        eq(true,new CategoryStore(ctx).choices("지출",seed).contains("반려동물"));
+        eq(false,categories.choices("수입",seed).contains("반려동물"));
+        eq(true,categories.choices("지출",Arrays.asList(new Ledger.Entry("import","2026-10-27","지출",10,"엑셀 분류","",2))).contains("엑셀 분류"));
+        try {categories.remember("저축","   ");throw new AssertionError("Blank category accepted");}catch(IllegalArgumentException expected){checks++;}
+        try {categories.remember("저축",String.join("",Collections.nCopies(41,"가")));throw new AssertionError("Long category accepted");}catch(IllegalArgumentException expected){checks++;}
         Activity a=startActivitySync(new Intent(ctx,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();
         runOnMainSync(()->{try{set(a,"month",YearMonth.of(2026,10));set(a,"selected",LocalDate.of(2026,10,27));invoke(a,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
         eq(true,findText(a.getWindow().getDecorView(),"1,987,500원")!=null);
@@ -63,8 +78,36 @@ public class DeviceChecks extends Instrumentation {
         runOnMainSync(()->app.onActivityResult(12,Activity.RESULT_OK,new Intent().setData(android.net.Uri.fromFile(sampleFile))));awaitIdle(app);
         eq(true,getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText("추가할 내역이 없어요").size()>0);clickText("확인");
         verify=new LedgerDb(ctx);eq(3,verify.all().size());verify.close();
+        categoryUiChecks(app);
         runOnMainSync(()->a.finish());waitForIdleSync();
     }
+    void categoryUiChecks(MainActivity app)throws Exception {
+        runOnMainSync(()->{try{set(app,"tab",0);invoke(app,"render");}catch(Exception e){throw new RuntimeException(e);}});waitForIdleSync();
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"수입, 지출, 저축 기록 추가").performClick());waitForIdleSync();Thread.sleep(200);
+        List<AccessibilityNodeInfo> edits=new ArrayList<>();collectEdits(getUiAutomation().getRootInActiveWindow(),edits);setText(edits.get(0),"4500");
+        clickText("+ 분류 추가");waitForIdleSync();Thread.sleep(200);edits.clear();collectEdits(getUiAutomation().getRootInActiveWindow(),edits);eq(1,edits.size());
+        clickText("추가");waitForIdleSync();eq(true,getUiAutomation().getRootInActiveWindow().findAccessibilityNodeInfosByText("지출 분류 추가").size()>0);
+        setText(edits.get(0),"반려동물 병원");clickText("추가");waitForIdleSync();Thread.sleep(200);
+        edits.clear();collectEdits(getUiAutomation().getRootInActiveWindow(),edits);eq("반려동물 병원",edits.get(2).getText().toString());eq("4500",edits.get(0).getText().toString());
+        screenshot(getTargetContext(),"category-entry");clickText("저장");waitForIdleSync();Thread.sleep(200);
+        LedgerDb db=new LedgerDb(getTargetContext());eq(4,db.all().size());eq(true,db.all().stream().anyMatch(e->e.category.equals("반려동물 병원") && e.amount==4500));db.close();
+        eq(true,new CategoryStore(getTargetContext()).choices("지출",Collections.emptyList()).contains("반려동물 병원"));
+        runOnMainSync(()->findDesc(app.getWindow().getDecorView(),"수입, 지출, 저축 기록 추가").performClick());waitForIdleSync();Thread.sleep(200);
+        clickText("분류 선택");waitForIdleSync();screenshot(getTargetContext(),"category-choices");clickListItem("반려동물 병원");waitForIdleSync();
+        edits.clear();collectEdits(getUiAutomation().getRootInActiveWindow(),edits);eq("반려동물 병원",edits.get(2).getText().toString());
+        clickText("수입");clickText("분류 선택");waitForIdleSync();clickText("부수입");waitForIdleSync();
+        edits.clear();collectEdits(getUiAutomation().getRootInActiveWindow(),edits);eq("부수입",edits.get(2).getText().toString());
+        clickText("취소");waitForIdleSync();db=new LedgerDb(getTargetContext());eq(4,db.all().size());db.close();
+    }
+    void clickListItem(String text)throws Exception {
+        for(int i=0;i<12;i++){
+            AccessibilityNodeInfo root=getUiAutomation().getRootInActiveWindow();
+            for(AccessibilityNodeInfo n:root.findAccessibilityNodeInfosByText(text))if(text.contentEquals(n.getText())){eq(true,n.performAction(AccessibilityNodeInfo.ACTION_CLICK));return;}
+            AccessibilityNodeInfo list=findClass(root,"android.widget.ListView");if(list==null || !list.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD))break;
+            waitForIdleSync();Thread.sleep(150);
+        }throw new AssertionError("Category not found: "+text);
+    }
+    AccessibilityNodeInfo findClass(AccessibilityNodeInfo node,String type){if(node==null)return null;if(type.contentEquals(node.getClassName()))return node;for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo found=findClass(node.getChild(i),type);if(found!=null)return found;}return null;}
     static void set(Object o,String name,Object value)throws Exception{Field f=o.getClass().getDeclaredField(name);f.setAccessible(true);f.set(o,value);}
     static void invoke(Object o,String name)throws Exception{Method m=o.getClass().getDeclaredMethod(name);m.setAccessible(true);m.invoke(o);}
     void awaitIdle(MainActivity app)throws Exception{Thread.sleep(200);for(int i=0;i<100;i++){final boolean[] active={false};runOnMainSync(()->{try{Field f=MainActivity.class.getDeclaredField("busy");f.setAccessible(true);active[0]=f.getBoolean(app);}catch(Exception e){throw new RuntimeException(e);}});if(!active[0]){waitForIdleSync();Thread.sleep(150);return;}Thread.sleep(100);}throw new AssertionError("File operation timed out");}
