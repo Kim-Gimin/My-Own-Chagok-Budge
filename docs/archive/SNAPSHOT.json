@@ -1,11 +1,11 @@
 {
   "version": "0.6.2",
   "code": 11,
-  "variant": "-screen-unified",
-  "tag": "v0.6.2-screen-unified",
-  "source": "chagok-source-0.6.2-화면통일.zip",
-  "source_sha256": "59356a9a76e540a88df7fe790062e105c680719d5606d1174987d79307405277",
-  "files": 58,
+  "variant": "-lifestyle",
+  "tag": "v0.6.2-lifestyle",
+  "source": "chagok-source-0.6.2-생활관리.zip",
+  "source_sha256": "03ac11e54a76043eb33c68fa65970f67bdc930c4700b75dde5d5c318bdc94afa",
+  "files": 65,
   "excluded": [
     "local-test.keystore"
   ],
