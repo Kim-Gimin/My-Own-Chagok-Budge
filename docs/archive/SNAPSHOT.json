@@ -1,9 +1,9 @@
 {
   "version": "0.6.2",
   "code": 11,
-  "variant": "-transaction-groups",
-  "tag": "v0.6.2-transaction-groups",
-  "source": "작업-0.6.2-거래분류/chagok-source-0.6.2-거래분류.zip",
+  "variant": "-full-comparison",
+  "tag": "v0.6.2-full-comparison",
+  "source": "작업-0.6.2-거래분류/chagok-source-0.6.2-전체비교.zip",
   "source_sha256": "78062e9a2703fb50929dbada8cf64c6c5346291a76fb9c59a4d9d56f97a2a39f",
   "files": 57,
   "excluded": [
