@@ -9,6 +9,8 @@ final class AppPreferences {
     private final Context context;private final SharedPreferences prefs;
     AppPreferences(Context context){this.context=context;prefs=context.getSharedPreferences("app_preferences",Context.MODE_PRIVATE);}
     boolean dark(){return prefs.getBoolean("dark",false);}
+    boolean historyActionsExpanded(){return prefs.getBoolean("history_actions_expanded",true);}
+    void historyActionsExpanded(boolean expanded){prefs.edit().putBoolean("history_actions_expanded",expanded).commit();}
     void dark(boolean enabled){prefs.edit().putBoolean("dark",enabled).commit();}
     int startTab(){int tab=prefs.getInt("start_tab",2);return Arrays.asList(4,2,5,0,1).contains(tab)?tab:2;}
     void startTab(int tab){prefs.edit().putInt("start_tab",tab).commit();}

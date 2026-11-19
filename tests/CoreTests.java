@@ -26,6 +26,18 @@ public final class CoreTests {
     }
     private static byte[] zip(Map<String,String> parts)throws Exception {ByteArrayOutputStream out=new ByteArrayOutputStream();try(ZipOutputStream z=new ZipOutputStream(out)){for(Map.Entry<String,String> p:parts.entrySet()){z.putNextEntry(new ZipEntry(p.getKey()));z.write(p.getValue().getBytes(StandardCharsets.UTF_8));z.closeEntry();}}return out.toByteArray();}
     private static XlsxIO.ReadResult read(byte[] bytes)throws Exception{return XlsxIO.read(new ByteArrayInputStream(bytes));}
+    private static void historyActionsChecks(){
+        HistoryActionsState state=new HistoryActionsState(true);eq(true,state.expanded());eq(true,state.visible());
+        state.beginScroll();eq(true,state.expanded());eq(false,state.visible());state.endScroll();eq(true,state.visible());
+        state.beginScroll();state.toggle();eq(false,state.expanded());eq(false,state.visible());
+        // A delayed scroll-idle callback must not reopen actions manually collapsed in the meantime.
+        state.endScroll();eq(false,state.visible());state.beginScroll();state.endScroll();eq(false,state.visible());
+        HistoryActionsState reopened=new HistoryActionsState(state.expanded());eq(false,reopened.expanded());eq(false,reopened.visible());
+        reopened.beginScroll();reopened.toggle();eq(true,reopened.expanded());eq(true,reopened.visible());
+        reopened.beginScroll();eq(false,reopened.visible());reopened.endScroll();eq(true,reopened.visible());
+        reopened.toggle();reopened.endScroll();eq(false,reopened.visible());reopened.toggle();eq(true,reopened.visible());
+        for(int i=0;i<5;i++){reopened.beginScroll();eq(false,reopened.visible());reopened.endScroll();eq(true,reopened.visible());}
+    }
     private static void nearDouble(double expected,double actual){checks++;if(!Double.isFinite(actual)||Math.abs(expected-actual)>1e-9)throw new AssertionError("expected="+expected+", actual="+actual);}
     private static void comparisonChecks()throws Exception {
         List<Ledger.Entry> entries=Arrays.asList(entry("old","2025-12-31","수입",1000),entry("i","2026-01-01","수입",3000),entry("e","2026-01-02","지출",1200),entry("s","2026-01-03","저축",600),entry("v","2026-01-04","투자",200),entry("feb","2026-02-01","투자",500),entry("future","2027-01-01","수입",9000));
@@ -159,6 +171,7 @@ public final class CoreTests {
         eq(true,IconGeometry.GEAR_HOLE>1.5f&&IconGeometry.GEAR_HOLE+0.9f<IconGeometry.GEAR_ROOT-0.9f);
     }
     public static void main(String[] args)throws Exception {
+        historyActionsChecks();
         comparisonChecks();
         typeAndExportChecks();
         overviewChecks();

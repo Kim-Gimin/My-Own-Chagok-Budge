@@ -39,7 +39,7 @@ final class DonutChartView extends View {
         this.palette=palette.length==0?PALETTE:palette.clone();this.centerLabel=centerLabel;
         this.surface=surface;this.ink=ink;this.muted=muted;this.emptyColor=emptyColor;this.font=font;this.rotation=rotation;this.listener=listener;touchSlop=ViewConfiguration.get(context).getScaledTouchSlop();setClickable(true);
         fontScale=getResources().getDisplayMetrics().scaledDensity;
-        setContentDescription(data.type+" 분류별 원형 차트, 합계 "+NumberFormat.getIntegerInstance(Locale.KOREA).format(data.total)+"원, "+data.categories.size()+"개 분류");
+        setContentDescription(data.type+" 상세 분류별 원형 차트, 합계 "+NumberFormat.getIntegerInstance(Locale.KOREA).format(data.total)+"원, "+data.categories.size()+"개 상세 분류");
     }
     private int chartColor(int index){return palette[Math.min(index,palette.length-1)];}
     private float dp(float value){return value*density;}

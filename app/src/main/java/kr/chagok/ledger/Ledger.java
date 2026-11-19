@@ -24,7 +24,7 @@ public final class Ledger {
             this.amount = amount;
             this.category = category == null || category.trim().isEmpty() ? "기타" : category.trim();
             this.memo = memo == null ? "" : memo.trim();
-            if (this.category.length() > 40) throw new IllegalArgumentException("분류는 40자까지 입력할 수 있어요.");
+            if (this.category.length() > 40) throw new IllegalArgumentException("상세 분류는 40자까지 입력할 수 있어요.");
             if (this.memo.length() > 500) throw new IllegalArgumentException("메모는 500자까지 입력할 수 있어요.");
             if (this.id.length() > 128 || this.id.matches(".*[\\p{Cntrl}].*")) throw new IllegalArgumentException("고유ID 형식을 확인하세요.");
             this.sourceRow = row;
