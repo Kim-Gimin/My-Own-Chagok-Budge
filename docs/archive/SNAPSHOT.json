@@ -1,11 +1,11 @@
 {
-  "version": "0.8.8",
-  "code": 22,
+  "version": "0.8.9",
+  "code": 23,
   "variant": "",
-  "tag": "v0.8.8",
-  "source": "chagok-source-0.8.8.zip",
-  "source_sha256": "36ed357d831068f3f1ded4914d8eb4a398506d18cf4bb18bbf4935dc36391573",
-  "files": 83,
+  "tag": "v0.8.9",
+  "source": "chagok-source-0.8.9.zip",
+  "source_sha256": "fc449ba3131cd73d2571b8af5f77da3db814060504df8364f830e60505c3cf0a",
+  "files": 87,
   "excluded": [
     "local-test.keystore"
   ],

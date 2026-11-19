@@ -68,7 +68,7 @@ public final class MainActivity extends Activity {
     private HistoryActionsState historyActions;
     private Runnable revealHistoryRail;
     private AlertDialog progress;
-    private boolean busy,resetting;
+    private boolean busy,resetting,categoryCleanupFailed;
     private YearMonth pendingExportMonth;
 
     @Override public void onCreate(Bundle state) {
@@ -76,7 +76,7 @@ public final class MainActivity extends Activity {
         historyActions=new HistoryActionsState(preferences.historyActionsExpanded());
         setTheme(getResources().getIdentifier(preferences.dark()?"AppThemeDark":"AppTheme","style",getPackageName()));
         super.onCreate(state);
-        db=new LedgerDb(this);backupStatus=new BackupStatus(this);BackupReminderService.schedule(this);
+        db=new LedgerDb(this);try{CategoryMigration.run(this,db);}catch(Exception ex){categoryCleanupFailed=true;TextView hint=new TextView(this);hint.setText("분류 정리를 완료하지 못했어요. 기존 자료를 보호하기 위해 장부를 열지 않았어요.");hint.setPadding(40,60,40,40);setContentView(hint);new AlertDialog.Builder(this).setTitle("분류 정리 확인").setMessage("저장 공간과 파일 접근 상태를 확인한 뒤 다시 시도해 주세요. 실패한 변경은 되돌리고 다음 시작 때 복구해요.").setCancelable(false).setPositiveButton("다시 시도",(d,w)->recreate()).setNegativeButton("닫기",(d,w)->finish()).show();android.util.Log.e("CategoryCleanup","정리 실패",ex);return;}backupStatus=new BackupStatus(this);BackupReminderService.schedule(this);
         categories=new CategoryStore(this);
         tab=preferences.startTab();appFont=preferences.font();applyAppearance();unlocked=!preferences.hasPin();
         statisticsMode=preferences.statisticsMode();statisticsYear=preferences.statisticsYear();month=preferences.statisticsMonth();statisticsFrom=preferences.statisticsDate(true);statisticsTo=preferences.statisticsDate(false);
@@ -94,7 +94,7 @@ public final class MainActivity extends Activity {
             comparisonRotation=state.getFloat("comparisonRotation",0);
             float[] rotations=state.getFloatArray("rotations");if(rotations!=null)System.arraycopy(rotations,0,chartRotations,0,Math.min(rotations.length,chartRotations.length));
             String exportMonth=state.getString("exportMonth"); if(exportMonth!=null) pendingExportMonth=YearMonth.parse(exportMonth);
-            recordsAll=state.getBoolean("recordsAll",true);recordSort=state.getInt("recordSort",recordSort);ArrayList<String> categoryState=state.getStringArrayList("recordCategories");if(categoryState!=null)recordCategories=new HashSet<>(categoryState);
+            recordsAll=state.getBoolean("recordsAll",true);recordSort=state.getInt("recordSort",recordSort);ArrayList<String> categoryState=state.getStringArrayList("recordCategories");if(categoryState!=null){recordCategories=new HashSet<>();for(String raw:categoryState){String cleaned=Ledger.cleanCategory(raw);recordCategories.add(cleaned.isEmpty()?"기타":cleaned);}}
         }
         if(state!=null){guideSection=state.getInt("guideSection",-1);planSection=state.getInt("planSection",0);trendMonths=state.getInt("trendMonths",6);String tm=state.getString("trendSelected");if(tm!=null)trendSelected=YearMonth.parse(tm);}
         if(state!=null&&(continuing||externalActivityPending))calendarMonth=YearMonth.parse(state.getString("calendarMonth",calendarMonth.toString()));
@@ -123,11 +123,11 @@ public final class MainActivity extends Activity {
         try{super.startActivityForResult(intent,requestCode,options);}catch(RuntimeException ex){externalActivityPending=false;throw ex;}
     }
     @Override public void onPause(){paused=true;dismissExitDialog();super.onPause();}
-    @Override public void onResume(){super.onResume();boolean reopenHome=!busy&&((returnHomeOnResume&&!externalActivityPending)||((stopped||paused)&&(tab==6||tab==9)));stopped=false;paused=false;returnHomeOnResume=false;externalActivityPending=false;if(reopenHome){tab=5;resetCalendarToday();}if(preferences!=null && preferences.hasPin() && !unlocked)render();else if(reopenHome)render();else if(tab==2&&statisticsMode==StatisticsPeriod.YTD&&!LocalDate.now().equals(renderedStatisticsToday))render();else if(tab==1&&historyRail!=null){historyActions.endScroll();updateHistoryActions(false);}}
+    @Override public void onResume(){super.onResume();if(categoryCleanupFailed)return;boolean reopenHome=!busy&&((returnHomeOnResume&&!externalActivityPending)||((stopped||paused)&&(tab==6||tab==9)));stopped=false;paused=false;returnHomeOnResume=false;externalActivityPending=false;if(reopenHome){tab=5;resetCalendarToday();}if(preferences!=null && preferences.hasPin() && !unlocked)render();else if(reopenHome)render();else if(tab==2&&statisticsMode==StatisticsPeriod.YTD&&!LocalDate.now().equals(renderedStatisticsToday))render();else if(tab==1&&historyRail!=null){historyActions.endScroll();updateHistoryActions(false);}}
     @Override public void onStop(){stopped=true;dismissExitDialog();if(historyRail!=null&&revealHistoryRail!=null)historyRail.removeCallbacks(revealHistoryRail);if(preferences!=null && preferences.hasPin() && !isChangingConfigurations())unlocked=false;super.onStop();}
     @Override public void onBackPressed(){handleBack();}
     private void handleBack(){
-        if(isFinishing()||isDestroyed()||resetting)return;
+        if(isFinishing()||isDestroyed()||resetting)return;if(categoryCleanupFailed){finish();return;}
         if(preferences.hasPin()&&!unlocked){finish();return;}
         if(busy){toast("진행 중인 작업이 끝난 뒤 다시 시도해 주세요.");return;}
         if(exitDialog!=null&&exitDialog.isShowing()){closeApp();return;}
@@ -432,11 +432,15 @@ public final class MainActivity extends Activity {
     }
     private void selectCalendarDate(LocalDate date){int position=pageScroll.getScrollY();selected=date;displayLimit=100;render();ScrollView scroll=pageScroll;scroll.post(()->{if(tab==0&&pageScroll==scroll)scroll.scrollTo(0,position);});}
     private void calendar() {
+        PlanningData plan=db.planning();boolean living=preferences.calendarLivingOnly();List<Ledger.Entry> shown=living?plan.livingEntries(monthly):monthly;
+        LinearLayout toggles=row();for(int i=0;i<2;i++){final boolean target=i==1;boolean active=target==living;TextView mode=text(target?"생활비·자유용돈":"전체 내역",14,active?Color.WHITE:GREEN,true);mode.setGravity(Gravity.CENTER);mode.setMaxLines(1);mode.setHorizontallyScrolling(false);mode.setAutoSizeTextTypeUniformWithConfiguration(9,14,1,TypedValueCompat.SP);mode.setBackground(bg(active?GREEN:SUBTLE,12));mode.setContentDescription(target?"달력 생활비·자유용돈 보기":"달력 전체 내역 보기");mode.setSelected(active);mode.setOnClickListener(v->{try{preferences.calendarLivingOnly(target);render();}catch(Exception ex){error("보기 설정 확인",message(ex));}});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);if(i>0)lp.leftMargin=dp(8);toggles.addView(mode,lp);}page.addView(toggles);space(page,8);
+        if(living){TextView note=label(plan.hasLivingFilter()?"생활비 반영으로 선택한 지출만 표시해요.":"분류를 아직 지정하지 않아 모든 지출을 표시해요.",12,MUTED);page.addView(note);TextView configure=button("생활비 분류 선택",GREEN,false,this::calendarLivingCategories);configure.setContentDescription("달력 생활비 분류 선택");page.addView(configure);space(page,8);}
+
         LinearLayout c=card(page); c.setPadding(dp(8),dp(15),dp(8),dp(10));
         LinearLayout weekdays=row(); String[] labels={"일","월","화","수","목","금","토"};
         for(int i=0;i<7;i++) { TextView t=text(labels[i],12,i==0?RED:i==6?0xFF6485B7:MUTED,false); t.setGravity(Gravity.CENTER); weekdays.addView(t,new LinearLayout.LayoutParams(0,dp(30),1)); } c.addView(weekdays);
         Map<String,long[]> daily=new HashMap<>();
-        for(Ledger.Entry e:monthly) { long[] d=daily.get(e.date); if(d==null) {d=new long[Ledger.TYPES.length]; daily.put(e.date,d);} d[Ledger.index(e.type)]+=e.effect(); }
+        for(Ledger.Entry e:shown) { long[] d=daily.get(e.date); if(d==null) {d=new long[Ledger.TYPES.length]; daily.put(e.date,d);} d[Ledger.index(e.type)]+=e.effect(); }
         int offset=calendarMonth.atDay(1).getDayOfWeek().getValue()%7, n=calendarMonth.lengthOfMonth();
         int weeks=(offset+n+6)/7;
         for(int w=0;w<weeks;w++) {
@@ -452,21 +456,26 @@ public final class MainActivity extends Activity {
                 cell.addView(dayText,new LinearLayout.LayoutParams(dp(23),dp(23))); space(cell,2);
                 long[] t=daily.get(date.toString());
                 if(t!=null) for(int i=0;i<Ledger.TYPES.length;i++) if(t[i]>0) {
-                    TextView amount=text((i==0?"+":"−")+shortMoney(t[i]),9,COLORS[i],false); amount.setSingleLine(true); amount.setGravity(Gravity.CENTER); cell.addView(amount,new LinearLayout.LayoutParams(-1,dp(11)));
+                    TextView amount=text((i==0?"+":"−")+shortMoney(t[i]),9,COLORS[i],false); amount.setContentDescription((living?"생활비 지출 ":Ledger.TYPES[i]+" ")+won(t[i]));amount.setSingleLine(true); amount.setGravity(Gravity.CENTER); cell.addView(amount,new LinearLayout.LayoutParams(-1,dp(11)));
                 }
                 cell.setContentDescription(date+" 날짜 선택");cell.setSelected(active); cell.setOnClickListener(v->selectCalendarDate(date));
             }
             c.addView(week);
         }
         LinearLayout legend=row(); legend.setGravity(Gravity.CENTER); legend.setPadding(0,dp(5),0,dp(3));
-        for(int i=0;i<Ledger.TYPES.length;i++) { TextView t=label("● "+Ledger.TYPES[i]+"   ",11,COLORS[i]); legend.addView(t); } c.addView(legend);
+        for(int i=0;i<Ledger.TYPES.length;i++) {if(living&&i!=1)continue; TextView t=label("● "+(living?"생활비·자유용돈":Ledger.TYPES[i])+"   ",11,COLORS[i]); legend.addView(t); } c.addView(legend);
         space(page,7);
         LinearLayout heading=row(); TextView date=text(selected.format(DateTimeFormatter.ofPattern("M월 d일 EEEE",Locale.KOREA)),17,INK,true); heading.addView(date,new LinearLayout.LayoutParams(0,-2,1));
-        List<Ledger.Entry> entries=new ArrayList<>(); for(Ledger.Entry e:monthly) if(e.date.equals(selected.toString())) entries.add(e);
+        List<Ledger.Entry> entries=new ArrayList<>(); for(Ledger.Entry e:shown) if(e.date.equals(selected.toString())) entries.add(e);
         heading.addView(label(entries.size()+"건",12,MUTED)); page.addView(heading); space(page,12);
-        if(entries.isEmpty()) empty(page,"아직 기록이 없어요","오른쪽 아래 + 버튼으로 선택한 날짜에 기록해 보세요.");
+        if(entries.isEmpty()) empty(page,living?"이 날짜에 생활비 내역이 없어요":"아직 기록이 없어요",living?"생활비 분류 선택이나 전체 내역 보기를 확인하세요.":"오른쪽 아래 + 버튼으로 선택한 날짜에 기록해 보세요.");
         else showEntries(page,entries,false);
-        space(page,16);summary();
+        space(page,16);if(living){LinearLayout total=card(page);valueRow(total,"이번 달 생활비·자유용돈",Ledger.totals(shown)[1],RED,17,true,0);total.addView(label(shown.size()+"건 · 생활비로 선택한 지출만 합산해요.",12,MUTED));total.setContentDescription("달력 생활비 월 합계 "+Ledger.totals(shown)[1]+"원 "+shown.size()+"건");}else summary();
+    }
+    private void calendarLivingCategories(){
+        PlanningData current=db.planning();List<Ledger.Entry> records=db.all();LinkedHashSet<String> options=new LinkedHashSet<>(categories.choices("지출",records,current));for(Ledger.Entry e:records)if(e.type.equals("지출"))options.add(e.category);options.addAll(current.livingCategories());
+        LinearLayout form=planForm();form.addView(label("생활비 예산과 달력에 같은 선택을 사용해요. 수입·저축·투자와 전체 거래·통계는 바꾸지 않아요. 모든 월에 공통으로 적용돼요.",13,MUTED));EditText amount=new EditText(this);LivingBudgetSelector selector=new LivingBudgetSelector(this,new ArrayList<>(options),current.hasLivingFilter()?current.livingCategories():options,amount,calendarMonth,records,INK,MUTED,GREEN,INPUT,appFont,false);form.addView(selector);
+        ScrollView scroll=new ScrollView(this);scroll.addView(form);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("생활비·자유용돈 분류 선택").setView(scroll).setNegativeButton("취소",null).setPositiveButton("저장",null).create();dialog.setOnShowListener(d->dialog.getButton(-1).setOnClickListener(v->{try{PlanningData next=db.planning();next.selectLivingCategories(selector.selected());db.savePlanning(next);dialog.dismiss();render();}catch(Exception ex){error("선택을 저장하지 못했어요",message(ex));}}));dialog.show();
     }
     private void records() {
         LinearLayout controls=column();controls.setPadding(dp(16),dp(3),dp(16),dp(8));LinearLayout scope=row();
@@ -527,7 +536,7 @@ public final class MainActivity extends Activity {
     }
     private void searchRecords(){LinearLayout form=column();form.setPadding(dp(22),dp(10),dp(22),dp(8));EditText query=field(form,"메모 검색",search,android.text.InputType.TYPE_CLASS_TEXT);query.setSingleLine(true);query.setHint("예: 점심, 월세");query.setContentDescription("메모 검색어");query.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});form.addView(label("현재 기간·돈의 성격·상세 분류 안에서 메모를 찾아요.",12,MUTED));new AlertDialog.Builder(this).setTitle("메모로 검색하기").setView(form).setNegativeButton("취소",null).setNeutralButton("검색 해제",(d,w)->{search="";displayLimit=100;render();}).setPositiveButton("검색",(d,w)->{search=query.getText().toString().trim();displayLimit=100;hideKeyboard();render();}).show();}
     private void chooseRecordCategories(){
-        Set<String> draft=new HashSet<>(recordCategories);final int[] order={HistoryData.CATEGORY};TreeSet<String> options=new TreeSet<>((a,b)->{int result=java.text.Collator.getInstance(Locale.KOREA).compare(a,b);return result!=0?result:a.compareTo(b);});for(String type:Ledger.TYPES)options.addAll(categories.choices(type,all));for(Ledger.Entry entry:all)options.add(entry.category);options.addAll(draft);
+        Set<String> draft=new HashSet<>(recordCategories);final int[] order={HistoryData.CATEGORY};TreeSet<String> options=new TreeSet<>((a,b)->{int result=java.text.Collator.getInstance(Locale.KOREA).compare(a,b);return result!=0?result:a.compareTo(b);});for(String type:Ledger.TYPES)options.addAll(categories.choices(type,all,db.planning()));for(Ledger.Entry entry:all)options.add(entry.category);options.addAll(draft);
         LinearLayout form=column();form.setPadding(dp(20),dp(8),dp(20),dp(10));form.addView(label("선택하지 않으면 모든 상세 분류를 보여줘요.",12,MUTED));RadioGroup modes=new RadioGroup(this);modes.setOrientation(LinearLayout.HORIZONTAL);for(int i=0;i<2;i++){RadioButton mode=new RadioButton(this);mode.setId(300+i);mode.setText(i==0?"날짜순":"상세 분류순");mode.setTextColor(INK);mode.setTextSize(13);mode.setTypeface(appFont);modes.addView(mode,new RadioGroup.LayoutParams(0,dp(45),1));}modes.check(301);modes.setOnCheckedChangeListener((g,id)->order[0]=id-300);form.addView(modes);line(form);space(form,8);for(String category:options){CheckBox check=new CheckBox(this);check.setText(category);check.setTextColor(INK);check.setTextSize(14);check.setTypeface(appFont);check.setChecked(draft.contains(category));check.setContentDescription(category+" 상세 분류 선택");check.setPadding(0,dp(6),0,dp(6));check.setOnCheckedChangeListener((b,on)->{if(on)draft.add(category);else draft.remove(category);});form.addView(check,new LinearLayout.LayoutParams(-1,-2));}ScrollView scroll=new ScrollView(this);scroll.addView(form);new AlertDialog.Builder(this).setTitle("선택한 상세 분류로 정렬").setView(scroll).setNegativeButton("취소",null).setNeutralButton("전체 보기",(d,w)->{recordCategories.clear();recordSort=HistoryData.DATE;preferences.recordSort(recordSort);displayLimit=100;render();}).setPositiveButton("확인",(d,w)->{recordCategories=draft;recordSort=order[0];preferences.recordSort(recordSort);displayLimit=100;render();}).show();
     }
     private void showEntries(LinearLayout parent,List<Ledger.Entry> entries,boolean groupDates) {
@@ -675,8 +684,8 @@ public final class MainActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.addView(form);AlertDialog dialog=new AlertDialog.Builder(this).setTitle(draft.type+" 금액 입력").setView(scroll).setNegativeButton("취소",null).setPositiveButton("적용",null).create();dialog.setOnShowListener(d->dialog.getButton(-1).setOnClickListener(v->{try{Ledger.parseAmount(draft.amount);dialog.dismiss();entryDetailsStep(draft);}catch(Exception ex){error.setText("금액은 1원 이상 입력하세요.");}}));amountDialog[0]=dialog;dialog.show();
     }
     private void entryDetailsStep(NewEntryDraft draft){
-        if(isFinishing()||isDestroyed()||draft.saved)return;LinearLayout form=column();form.setPadding(dp(22),dp(8),dp(22),dp(12));TextView summary=text(draft.date+" · "+draft.type+"\n"+won(Long.parseLong(draft.amount)),18,COLORS[Ledger.index(draft.type)],true);summary.setLineSpacing(dp(5),1);form.addView(summary);space(form,20);EditText category=field(form,"상세 분류",draft.category,android.text.InputType.TYPE_CLASS_TEXT);category.setSingleLine(true);category.setHint(draft.type+"의 상세 분류를 선택하거나 입력하세요");category.setContentDescription("새 기록 상세 분류");category.setFilters(new InputFilter[]{new InputFilter.LengthFilter(40)});LinearLayout actions=row();actions.addView(categoryAction("상세 분류 선택",()->chooseCategory(draft.type,category,true)),new LinearLayout.LayoutParams(0,dp(48),1));LinearLayout.LayoutParams add=new LinearLayout.LayoutParams(0,dp(48),1);add.leftMargin=dp(4);actions.addView(categoryAction("+ 상세 분류 추가",()->addCategory(draft.type,category)),add);form.addView(actions);space(form,15);EditText memo=field(form,"메모 (선택)",draft.memo,android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);memo.setContentDescription("새 기록 메모");memo.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});form.addView(label(draft.type.equals("저축회수")?"기존 저축 상세 분류를 선택하세요. 수입에 더하지 않고 순저축에서 빼며 사용 가능 금액에 돌려놓아요.":"금액이나 돈의 성격을 바꾸려면 이전을 누르세요.",12,MUTED));
-        ScrollView scroll=new ScrollView(this);scroll.addView(form);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("새 기록").setView(scroll).setNeutralButton("취소",null).setNegativeButton("이전",null).setPositiveButton("저장",null).create();Runnable remember=()->{draft.category=category.getText().toString();draft.memo=memo.getText().toString();};Runnable back=()->{remember.run();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(category.getWindowToken(),0);dialog.dismiss();entryAmountStep(draft);};dialog.setOnCancelListener(d->{remember.run();entryAmountStep(draft);});dialog.setOnShowListener(d->{dialog.getButton(-2).setOnClickListener(v->back.run());dialog.getButton(-1).setOnClickListener(v->{if(draft.saved)return;if(category.getText().toString().trim().isEmpty()){category.setError("상세 분류를 선택하거나 입력하세요.");return;}remember.run();try{Ledger.Entry entry=new Ledger.Entry(draft.entryId==null?UUID.randomUUID().toString():draft.entryId,draft.date.toString(),draft.type,Ledger.parseAmount(draft.amount),draft.category,draft.memo,0);dialog.getButton(-1).setEnabled(false);if(draft.repeatId==null)db.save(entry,false);else db.saveOccurrence(entry,draft.repeatId,draft.occurrence);draft.saved=true;recordSavedDate(draft.date);((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(memo.getWindowToken(),0);dialog.dismiss();render();toast("저장했어요.");}catch(Exception ex){dialog.getButton(-1).setEnabled(true);category.setError(ex.getMessage());}});});dialog.show();dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        if(isFinishing()||isDestroyed()||draft.saved)return;LinearLayout form=column();form.setPadding(dp(22),dp(8),dp(22),dp(12));TextView summary=text(draft.date+" · "+draft.type+"\n"+won(Long.parseLong(draft.amount)),18,COLORS[Ledger.index(draft.type)],true);summary.setLineSpacing(dp(5),1);form.addView(summary);space(form,20);EditText category=field(form,"상세 분류",draft.category,android.text.InputType.TYPE_CLASS_TEXT);category.setSingleLine(true);category.setHint(draft.type+" 상세 분류 · 비우면 기타");category.setContentDescription("새 기록 상세 분류");LinearLayout actions=row();actions.addView(categoryAction("상세 분류 선택",()->chooseCategory(draft.type,category,true)),new LinearLayout.LayoutParams(0,dp(48),1));LinearLayout.LayoutParams add=new LinearLayout.LayoutParams(0,dp(48),1);add.leftMargin=dp(4);actions.addView(categoryAction("+ 상세 분류 추가",()->addCategory(draft.type,category)),add);form.addView(actions);space(form,15);EditText memo=field(form,"메모 (선택)",draft.memo,android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);memo.setContentDescription("새 기록 메모");memo.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});form.addView(label(draft.type.equals("저축회수")?"기존 저축 상세 분류를 선택하세요. 수입에 더하지 않고 순저축에서 빼며 사용 가능 금액에 돌려놓아요.":"금액이나 돈의 성격을 바꾸려면 이전을 누르세요.",12,MUTED));
+        ScrollView scroll=new ScrollView(this);scroll.addView(form);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("새 기록").setView(scroll).setNeutralButton("취소",null).setNegativeButton("이전",null).setPositiveButton("저장",null).create();Runnable remember=()->{draft.category=category.getText().toString();draft.memo=memo.getText().toString();};Runnable back=()->{remember.run();((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(category.getWindowToken(),0);dialog.dismiss();entryAmountStep(draft);};dialog.setOnCancelListener(d->{remember.run();entryAmountStep(draft);});dialog.setOnShowListener(d->{dialog.getButton(-2).setOnClickListener(v->back.run());dialog.getButton(-1).setOnClickListener(v->{if(draft.saved)return;remember.run();try{Ledger.Entry entry=new Ledger.Entry(draft.entryId==null?UUID.randomUUID().toString():draft.entryId,draft.date.toString(),draft.type,Ledger.parseAmount(draft.amount),draft.category,draft.memo,0);dialog.getButton(-1).setEnabled(false);if(draft.repeatId==null)db.save(entry,false);else db.saveOccurrence(entry,draft.repeatId,draft.occurrence);draft.saved=true;recordSavedDate(draft.date);((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(memo.getWindowToken(),0);dialog.dismiss();render();toast("저장했어요.");}catch(Exception ex){dialog.getButton(-1).setEnabled(true);category.setError(ex.getMessage());}});});dialog.show();dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
     }
     private void amountKeypad(EditText target,String date,String type){
         ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(target.getWindowToken(),0);AmountKeypad draft=new AmountKeypad(target.getText().toString());LinearLayout form=column();form.setPadding(dp(20),dp(5),dp(20),dp(10));TextView when=label(date+" · "+type,13,MUTED);when.setGravity(Gravity.CENTER);form.addView(when);space(form,14);TextView amount=text("",30,COLORS[Ledger.index(type)],true);amount.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);amount.setSingleLine(true);amount.setAutoSizeTextTypeUniformWithConfiguration(17,30,1,TypedValueCompat.SP);amount.setContentDescription("키패드 금액");form.addView(amount,new LinearLayout.LayoutParams(-1,dp(47)));TextView error=label("",11,RED);form.addView(error);TextView clear=label("전체 지우기",12,MUTED);clear.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);clear.setMinHeight(dp(35));form.addView(clear,new LinearLayout.LayoutParams(-1,dp(35)));Runnable refresh=()->{amount.setText(number.format(draft.value())+" 원");error.setText("");};clear.setOnClickListener(v->{draft.clear();refresh.run();});
@@ -698,7 +707,7 @@ public final class MainActivity extends Activity {
         EditText date=field(form,"날짜",defaultDate.toString(),android.text.InputType.TYPE_CLASS_TEXT); date.setFocusable(false); date.setContentDescription("날짜 선택");
         amount.setShowSoftInputOnFocus(false);amount.setContentDescription("금액 입력 · 숫자 키패드 열기");amount.setOnClickListener(v->amountKeypad(amount,date.getText().toString(),chosen[0]));
         date.setOnClickListener(v->{LocalDate d=LocalDate.parse(date.getText().toString()); datePicker(d,"날짜 선택",(view,y,m,day)->date.setText(LocalDate.of(y,m+1,day).toString())).show();});
-        EditText category=field(form,"상세 분류",updating?entry.category:"",android.text.InputType.TYPE_CLASS_TEXT); category.setHint("예: 월급, 식비, 적금, 주식"); category.setSingleLine(true); category.setFilters(new InputFilter[]{new InputFilter.LengthFilter(40)});
+        EditText category=field(form,"상세 분류",updating?entry.category:"",android.text.InputType.TYPE_CLASS_TEXT); category.setHint("예: 월급, 식비, 적금, 주식"); category.setSingleLine(true); 
         LinearLayout categoryActions=row();
         TextView choose=categoryAction("상세 분류 선택",()->chooseCategory(chosen[0],category));
         TextView add=categoryAction("+ 상세 분류 추가",()->addCategory(chosen[0],category));
@@ -728,31 +737,31 @@ public final class MainActivity extends Activity {
     }
     private void chooseCategory(String type,EditText category,boolean clearDeleted) {
         hideKeyboard();
-        List<String> choices=categories.choices(type,db.all());
-        String current=category.getText().toString().trim();
+        List<String> choices=categories.choices(type,db.all(),db.planning());
+        String current=Ledger.cleanCategory(category.getText().toString());
         if(!current.isEmpty() && !choices.contains(current)&&!categories.deleted(type).contains(current)) choices.add(0,current);
         new AlertDialog.Builder(this).setTitle(type+" 상세 분류 선택")
             .setItems(choices.toArray(new String[0]),(d,index)->category.setText(choices.get(index)))
             .setNegativeButton("취소",null)
-            .setNeutralButton("상세 분류 관리",(d,w)->manageCategories(type,(kind,name)->{if(clearDeleted&&kind.equals(CategoryStore.kind(type))&&category.getText().toString().trim().equals(name))category.setText("");}))
+            .setNeutralButton("상세 분류 관리",(d,w)->manageCategories(type,(kind,name)->{if(clearDeleted&&kind.equals(CategoryStore.kind(type))&&Ledger.cleanCategory(category.getText().toString()).equals(name))category.setText("");}))
             .setPositiveButton("새 상세 분류 추가",(d,w)->addCategory(type,category)).show();
     }
     private void manageCategories(String initial,java.util.function.BiConsumer<String,String> removed){
-        final String[] type={CategoryStore.kind(initial)};LinearLayout form=column();form.setPadding(dp(18),dp(8),dp(18),dp(8));form.addView(label("상세 분류만 삭제하며 기존 기록과 합계는 유지해요.",12,MUTED));space(form,12);LinearLayout tabs=row(),list=column();TextView[] labels=new TextView[Ledger.TYPES.length];final Runnable[] refresh={null};refresh[0]=()->{for(int i=0;i<Ledger.TYPES.length;i++){boolean active=Ledger.TYPES[i].equals(type[0]);labels[i].setTextColor(active?Color.WHITE:COLORS[i]);labels[i].setBackground(bg(active?COLORS[i]:SUBTLE,10));labels[i].setSelected(active);}list.removeAllViews();List<String> choices=categories.choices(type[0],db.all());if(choices.isEmpty()){space(list,20);list.addView(label("상세 분류가 없어요. 새 상세 분류를 추가하거나 복원하세요.",13,MUTED));}for(String name:choices){LinearLayout r=row();r.setPadding(0,dp(4),0,dp(4));TextView title=text(name,14,INK,true);title.setMaxLines(3);r.addView(title,new LinearLayout.LayoutParams(0,-2,1));TextView delete=button("삭제",RED,false,()->{});delete.setPadding(dp(12),dp(10),dp(12),dp(10));delete.setContentDescription(type[0]+" "+name+" 상세 분류 삭제");delete.setOnClickListener(v->{String kind=type[0];try{categories.delete(kind,name);if(removed!=null)removed.accept(kind,name);refresh[0].run();}catch(Exception ex){error("상세 분류를 삭제하지 못했어요",message(ex));}});r.addView(delete,new LinearLayout.LayoutParams(dp(65),dp(44)));list.addView(r);}};
+        final String[] type={CategoryStore.kind(initial)};LinearLayout form=column();form.setPadding(dp(18),dp(8),dp(18),dp(8));form.addView(label("상세 분류만 삭제하며 기존 기록과 합계는 유지해요.",12,MUTED));space(form,12);LinearLayout tabs=row(),list=column();TextView[] labels=new TextView[Ledger.TYPES.length];final Runnable[] refresh={null};refresh[0]=()->{for(int i=0;i<Ledger.TYPES.length;i++){boolean active=Ledger.TYPES[i].equals(type[0]);labels[i].setTextColor(active?Color.WHITE:COLORS[i]);labels[i].setBackground(bg(active?COLORS[i]:SUBTLE,10));labels[i].setSelected(active);}list.removeAllViews();List<String> choices=categories.choices(type[0],db.all(),db.planning());if(choices.isEmpty()){space(list,20);list.addView(label("상세 분류가 없어요. 새 상세 분류를 추가하거나 복원하세요.",13,MUTED));}for(String name:choices){LinearLayout r=row();r.setPadding(0,dp(4),0,dp(4));TextView title=text(name,14,INK,true);title.setMaxLines(3);r.addView(title,new LinearLayout.LayoutParams(0,-2,1));TextView delete=button("삭제",RED,false,()->{});delete.setPadding(dp(12),dp(10),dp(12),dp(10));delete.setContentDescription(type[0]+" "+name+" 상세 분류 삭제");delete.setOnClickListener(v->{String kind=type[0];try{categories.delete(kind,name);if(removed!=null)removed.accept(kind,name);refresh[0].run();}catch(Exception ex){error("상세 분류를 삭제하지 못했어요",message(ex));}});r.addView(delete,new LinearLayout.LayoutParams(dp(65),dp(44)));list.addView(r);}};
         for(int i=0;i<Ledger.TYPES.length;i++){final int index=i;TextView label=text(Ledger.TYPES[i],14,COLORS[i],true);label.setGravity(Gravity.CENTER);label.setContentDescription(Ledger.TYPES[i]+" 상세 분류 관리");labels[i]=label;LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(40),1);if(i>0)p.leftMargin=dp(6);tabs.addView(label,p);label.setOnClickListener(v->{type[0]=Ledger.TYPES[index];refresh[0].run();});}form.addView(tabs);space(form,12);form.addView(list);ScrollView scroll=new ScrollView(this);scroll.addView(form);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("상세 분류 관리").setView(scroll).setPositiveButton("닫기",null).setNeutralButton("삭제한 상세 분류 복원",null).create();dialog.setOnShowListener(d->dialog.getButton(-3).setOnClickListener(v->{List<String> deleted=categories.deleted(type[0]);if(deleted.isEmpty()){toast("삭제한 상세 분류가 없어요.");return;}new AlertDialog.Builder(this).setTitle(type[0]+" 상세 분류 복원").setItems(deleted.toArray(new String[0]),(window,index)->{categories.remember(type[0],deleted.get(index));refresh[0].run();}).setNegativeButton("취소",null).show();}));refresh[0].run();dialog.show();
     }
     private void addCategory(String type,EditText category) {
         LinearLayout form=column(); form.setPadding(dp(22),dp(12),dp(22),dp(6));
         EditText name=field(form,"상세 분류 이름","",android.text.InputType.TYPE_CLASS_TEXT);
         name.setSingleLine(true); name.setHint("예: 반려동물, 보험, 운동");
-        name.setFilters(new InputFilter[]{new InputFilter.LengthFilter(40)});
+        
         TextView note=label(type+" 상세 분류에 저장하고 다음에도 선택할 수 있어요.",12,MUTED); form.addView(note);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle(type+" 상세 분류 추가").setView(form)
             .setNegativeButton("취소",null).setPositiveButton("추가",null).create();
         dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             try {
                 boolean added=categories.remember(type,name.getText().toString());
-                category.setText(name.getText().toString().trim());
+                category.setText(Ledger.cleanCategory(name.getText().toString()));
                 ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(name.getWindowToken(),0);
                 dialog.dismiss(); if(!added) toast("이미 있는 상세 분류를 선택했어요.");
             } catch(Exception ex) { name.setError(ex.getMessage()); }
@@ -773,7 +782,7 @@ public final class MainActivity extends Activity {
         try{startActivityForResult(intent,IMPORT);}catch(ActivityNotFoundException e){error("파일 앱을 찾을 수 없어요","휴대폰의 파일 선택 앱을 활성화해 주세요.");}
     }
     @Override public void onActivityResult(int request,int result,Intent data) {
-        super.onActivityResult(request,result,data); if(result!=RESULT_OK || data==null || data.getData()==null) return;
+        super.onActivityResult(request,result,data); if(categoryCleanupFailed)return;if(result!=RESULT_OK || data==null || data.getData()==null) return;
         if(preferences.hasPin()&&!unlocked){pendingRequest=request;pendingResult=result;pendingIntent=data;return;}
         Uri uri=data.getData();
         if(request==ARCHIVE_IMPORT){loadArchive(uri);return;}
@@ -868,14 +877,14 @@ public final class MainActivity extends Activity {
             if(type.equals("지출")&&l.category.isEmpty()){space(c,8);c.addView(label("전체 지출 "+won(PlanningData.progress(l,month,all).actual),13,MUTED));c.addView(label("생활비 반영 지출 "+won(p.actual),13,INK));c.addView(label(plan.hasLivingFilter()?"선택한 상세분류만 반영 · 모든 월 공통":"현재 모든 지출 반영",12,MUTED));}space(c,10);c.addView(button("금액·적용 범위 수정",GREEN,false,()->limitEditor(l,type)));}
     }
     private void limitEditor(PlanningData.Limit old,String type){
-        LinearLayout form=planForm();EditText amount=field(form,"금액 (원)",old==null?"":String.valueOf(old.amount),android.text.InputType.TYPE_CLASS_NUMBER);EditText category=field(form,"상세 분류 (비우면 전체)",old==null?"":old.category,android.text.InputType.TYPE_CLASS_TEXT);category.setSingleLine(true);category.setFilters(new InputFilter[]{new InputFilter.LengthFilter(40)});CheckBox monthly=new CheckBox(this);monthly.setText("매월 같은 금액으로 적용");monthly.setChecked(old!=null&&old.month.equals("*"));monthly.setTextColor(INK);monthly.setTypeface(appFont);form.addView(monthly);form.addView(label("선택하지 않으면 "+month+"에만 적용해요. 이 달에 따로 설정한 금액이 매월 기본값보다 우선해요.",12,MUTED));
+        LinearLayout form=planForm();EditText amount=field(form,"금액 (원)",old==null?"":String.valueOf(old.amount),android.text.InputType.TYPE_CLASS_NUMBER);EditText category=field(form,"상세 분류 (비우면 전체)",old==null?"":old.category,android.text.InputType.TYPE_CLASS_TEXT);category.setSingleLine(true);CheckBox monthly=new CheckBox(this);monthly.setText("매월 같은 금액으로 적용");monthly.setChecked(old!=null&&old.month.equals("*"));monthly.setTextColor(INK);monthly.setTypeface(appFont);form.addView(monthly);form.addView(label("선택하지 않으면 "+month+"에만 적용해요. 이 달에 따로 설정한 금액이 매월 기본값보다 우선해요.",12,MUTED));
         final LivingBudgetSelector selection;
         if(type.equals("지출")){
-            PlanningData current=db.planning();List<Ledger.Entry> records=db.all();LinkedHashSet<String> options=new LinkedHashSet<>(categories.choices("지출",records));
+            PlanningData current=db.planning();List<Ledger.Entry> records=db.all();LinkedHashSet<String> options=new LinkedHashSet<>(categories.choices("지출",records,current));
             TreeSet<String> used=new TreeSet<>();for(Ledger.Entry e:records)if(e.type.equals("지출"))used.add(e.category);options.addAll(used);options.addAll(current.livingCategories());
             Set<String> chosen=current.hasLivingFilter()?current.livingCategories():options;
             selection=new LivingBudgetSelector(this,new ArrayList<>(options),chosen,amount,month,records,INK,MUTED,GREEN,INPUT,appFont);form.addView(selection);
-            Runnable visibility=()->selection.setVisibility(category.getText().toString().trim().isEmpty()?View.VISIBLE:View.GONE);visibility.run();
+            Runnable visibility=()->selection.setVisibility(Ledger.cleanCategory(category.getText().toString()).isEmpty()?View.VISIBLE:View.GONE);visibility.run();
             category.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){visibility.run();}public void afterTextChanged(Editable value){}});
         }else selection=null;
         planDialog(type+("지출".equals(type)?" 예산 설정":" 목표 설정"),form,()->{PlanningData.Limit limit=new PlanningData.Limit(monthly.isChecked()?"*":month.toString(),type,category.getText().toString(),Ledger.parseAmount(amount.getText().toString()));PlanningData p=db.planning();if(old!=null)p.limits.removeIf(l->l.key().equals(old.key()));p.put(limit);if(selection!=null&&limit.category.isEmpty())p.selectLivingCategories(selection.selected());db.savePlanning(p);},old==null?null:()->{PlanningData p=db.planning();p.limits.removeIf(l->l.key().equals(old.key()));db.savePlanning(p);});

@@ -14,6 +14,9 @@ public final class Ledger {
     public static final String[] TYPES = {"수입", "지출", "저축", "투자"};
     /** Input choices; recovery reduces savings rather than adding a fifth statistics group. */
     public static final String[] INPUT_TYPES = {"수입", "지출", "저축", "투자", "저축회수"};
+    /** Remove edge separators only; internal spelling and spacing identify a category. */
+    public static String cleanCategory(String value){if(value==null)return "";int start=0,end=value.length();while(start<end){int c=value.codePointAt(start);if(!categorySpace(c))break;start+=Character.charCount(c);}while(end>start){int c=value.codePointBefore(end);if(!categorySpace(c))break;end-=Character.charCount(c);}return value.substring(start,end);}
+    private static boolean categorySpace(int c){return Character.isWhitespace(c)||Character.isSpaceChar(c)||c==0xFEFF||c==0x200B;}
     public static final class Entry {
         public final String id, date, type, category, memo;
         public final long amount;
@@ -24,7 +27,7 @@ public final class Ledger {
             this.type = normalizeType(type);
             if (amount < 1 || amount > MAX_AMOUNT) throw new IllegalArgumentException("금액은 1~999,999,999,999원의 정수로 입력하세요.");
             this.amount = amount;
-            this.category = category == null || category.trim().isEmpty() ? "기타" : category.trim();
+            this.category = cleanCategory(category).isEmpty()?"기타":cleanCategory(category);
             this.memo = memo == null ? "" : memo.trim();
             if (this.category.length() > 40) throw new IllegalArgumentException("상세 분류는 40자까지 입력할 수 있어요.");
             if (this.memo.length() > 500) throw new IllegalArgumentException("메모는 500자까지 입력할 수 있어요.");

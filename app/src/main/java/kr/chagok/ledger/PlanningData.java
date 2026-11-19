@@ -16,7 +16,7 @@ final class PlanningData {
     Set<String> livingCategories(){return livingCategories==null?Collections.emptySet():Collections.unmodifiableSet(livingCategories);}
     void selectLivingCategories(Collection<String> names){
         if(names==null||names.size()>10_000)throw new IllegalArgumentException("생활비 상세 분류는 최대 10,000개예요.");
-        Set<String> selected=new TreeSet<>();for(String name:names){String cleaned=name==null?"":name.trim();if(cleaned.isEmpty()||cleaned.length()>40)throw new IllegalArgumentException("생활비 상세 분류 이름을 확인하세요.");selected.add(cleaned);}livingCategories=selected;
+        Set<String> selected=new TreeSet<>();for(String name:names){String cleaned=Ledger.cleanCategory(name);if(cleaned.isEmpty()||cleaned.length()>40)throw new IllegalArgumentException("생활비 상세 분류 이름을 확인하세요.");selected.add(cleaned);}livingCategories=selected;
     }
     static String title(String value){String s=value==null?"":value.trim();if(s.isEmpty()||s.length()>40)throw new IllegalArgumentException("이름은 1~40자로 입력하세요.");return s;}
     static String id(String value){if(value==null||!value.matches("[A-Za-z0-9_-]{1,64}"))throw new IllegalArgumentException("설정 ID를 확인하세요.");return value;}
@@ -25,7 +25,7 @@ final class PlanningData {
         Limit(String month,String type,String category,long amount){
             if(!"*".equals(month)){YearMonth ym=YearMonth.parse(month);Ledger.normalizeDate(ym.atDay(1).toString());if(!ym.toString().equals(month))throw new IllegalArgumentException("월을 확인하세요.");}
             this.month=month;this.type=Ledger.normalizeType(type);if("수입".equals(this.type))throw new IllegalArgumentException("수입은 예산·납입 목표 대상이 아니에요.");
-            this.category=category==null?"":category.trim();if(this.category.length()>40)throw new IllegalArgumentException("상세 분류는 40자까지 입력하세요.");this.amount=Ledger.parseAmount(String.valueOf(amount));
+            this.category=Ledger.cleanCategory(category);if(this.category.length()>40)throw new IllegalArgumentException("상세 분류는 40자까지 입력하세요.");this.amount=Ledger.parseAmount(String.valueOf(amount));
         }
         String key(){return month+":"+type+":"+category;}
     }
@@ -69,10 +69,12 @@ final class PlanningData {
         long actual=0;for(Ledger.Entry e:entries)if(e.date.startsWith(month.toString())&&e.type.equals(limit.type)&&(limit.category.isEmpty()||e.category.equals(limit.category)))actual=Math.addExact(actual,e.amount);
         return new Progress(limit.amount,actual);
     }
+    boolean isLivingExpense(Ledger.Entry e){return e.type.equals("지출")&&(livingCategories==null||livingCategories.contains(e.category));}
+    List<Ledger.Entry> livingEntries(List<Ledger.Entry> entries){List<Ledger.Entry> out=new ArrayList<>();for(Ledger.Entry e:entries)if(isLivingExpense(e))out.add(e);return out;}
     /** Selection applies only to the overall monthly living budget, never other totals/goals. */
     Progress budgetProgress(Limit limit,YearMonth month,List<Ledger.Entry> entries){
         if(!limit.type.equals("지출")||!limit.category.isEmpty()||livingCategories==null)return progress(limit,month,entries);
-        long actual=0;for(Ledger.Entry e:entries)if(e.type.equals("지출")&&e.date.startsWith(month.toString())&&livingCategories.contains(e.category))actual=Math.addExact(actual,e.amount);
+        long actual=0;for(Ledger.Entry e:entries)if(isLivingExpense(e)&&e.date.startsWith(month.toString()))actual=Math.addExact(actual,e.amount);
         return new Progress(limit.amount,actual);
     }
     static final class MonthTotal {
@@ -110,11 +112,12 @@ final class PlanningData {
         }catch(IOException ex){throw new IllegalStateException("계획을 저장하지 못했어요.",ex);}
     }
     static int count(DataInputStream in)throws IOException{int n=in.readInt();if(n<0||n>MAX_ITEMS)throw new IOException("Too many settings");return n;}
-    static PlanningData decode(String encoded){
+    static PlanningData decode(String encoded){return decode(encoded,null);}
+    static PlanningData decode(String encoded,List<String> collisions){
         PlanningData p=new PlanningData();if(encoded==null||encoded.isEmpty())return p;
         if(encoded.length()>4_000_000)throw new IllegalArgumentException("계획 파일이 너무 커요.");
         try{DataInputStream in=new DataInputStream(new ByteArrayInputStream(Base64.getDecoder().decode(encoded)));int version=in.readInt();if(version!=0x43485031&&version!=0x43485032)throw new IOException("Unsupported planning version");
-            Set<String> keys=new HashSet<>();int n=count(in);for(int i=0;i<n;i++){Limit l=new Limit(in.readUTF(),in.readUTF(),in.readUTF(),in.readLong());if(!keys.add(l.key()))throw new IOException("Duplicate limit");p.put(l);}
+            Set<String> keys=new HashSet<>();Map<String,Boolean> canonical=new HashMap<>();int n=count(in);for(int i=0;i<n;i++){String month=in.readUTF(),type=in.readUTF(),raw=in.readUTF();long amount=in.readLong();Limit l=new Limit(month,type,raw,amount);if(!keys.add(month+":"+l.type+":"+raw))throw new IOException("Duplicate limit");boolean exact=raw.equals(l.category);Boolean old=canonical.get(l.key());if(old!=null){if(collisions!=null)collisions.add("Limit 분류 충돌: "+l.key()+" · 공백 없는 기존 값 우선");if(!old&&exact){for(int j=0;j<p.limits.size();j++)if(p.limits.get(j).key().equals(l.key()))p.limits.set(j,l);canonical.put(l.key(),true);}}else{p.put(l);canonical.put(l.key(),exact);}}
             keys.clear();n=count(in);for(int i=0;i<n;i++){Repeat r=new Repeat(in.readUTF(),in.readUTF(),in.readUTF(),in.readLong(),in.readUTF(),in.readUTF(),in.readUTF(),LocalDate.parse(in.readUTF()),in.readInt(),in.readInt(),in.readBoolean());if(!keys.add(r.id))throw new IOException("Duplicate repeat");p.put(r);}
             keys.clear();n=count(in);for(int i=0;i<n;i++){Favorite f=new Favorite(in.readUTF(),in.readUTF(),in.readUTF(),in.readLong(),in.readUTF(),in.readUTF());if(!keys.add(f.id))throw new IOException("Duplicate favorite");p.put(f);}
             if(version==0x43485032){n=in.readInt();if(n<0||n>10_000)throw new IOException("Too many living categories");Set<String> selected=new TreeSet<>();for(int i=0;i<n;i++){String name=in.readUTF();if(!selected.add(name)||!name.equals(name.trim()))throw new IOException("Invalid living category");}p.selectLivingCategories(selected);}

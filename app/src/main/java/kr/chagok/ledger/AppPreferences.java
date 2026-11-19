@@ -8,6 +8,8 @@ import java.time.*;
 final class AppPreferences {
     private final Context context;private final SharedPreferences prefs;
     AppPreferences(Context context){this.context=context;prefs=context.getSharedPreferences("app_preferences",Context.MODE_PRIVATE);}
+    boolean calendarLivingOnly(){return prefs.getBoolean("calendar_living_only",false);}
+    void calendarLivingOnly(boolean value){if(!prefs.edit().putBoolean("calendar_living_only",value).commit())throw new IllegalStateException("달력 보기 설정을 저장하지 못했어요.");}
     boolean dark(){return prefs.getBoolean("dark",false);}
     boolean historyActionsExpanded(){return prefs.getBoolean("history_actions_expanded",true);}
     void historyActionsExpanded(boolean expanded){prefs.edit().putBoolean("history_actions_expanded",expanded).commit();}

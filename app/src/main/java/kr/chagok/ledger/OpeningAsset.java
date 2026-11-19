@@ -10,7 +10,7 @@ public final class OpeningAsset {
   this.id=id==null?"":id.trim();if(this.id.length()>128||this.id.matches(".*[\\p{Cntrl}].*"))throw new IllegalArgumentException("기초자산 ID를 확인하세요.");
   this.date=Ledger.normalizeDate(date);if(!Arrays.asList(KINDS).contains(kind))throw new IllegalArgumentException("자산 종류는 현금, 저축, 투자 중 선택하세요.");this.kind=kind;
   if(amount<1||amount>Ledger.MAX_AMOUNT)throw new IllegalArgumentException("기초자산 금액은 1~999,999,999,999원이에요.");this.amount=amount;
-  this.category=category==null||category.trim().isEmpty()?"기타":category.trim();this.memo=memo==null?"":memo.trim();if(this.category.length()>40||this.memo.length()>500)throw new IllegalArgumentException("상세 분류는40자, 메모는500자까지예요.");
+  this.category=Ledger.cleanCategory(category).isEmpty()?"기타":Ledger.cleanCategory(category);this.memo=memo==null?"":memo.trim();if(this.category.length()>40||this.memo.length()>500)throw new IllegalArgumentException("상세 분류는40자, 메모는500자까지예요.");
  }
  public String fingerprint(){return date+":"+kind+":"+amount+":"+category.length()+":"+category+memo.length()+":"+memo;}
  public OpeningAsset withId(String id){return new OpeningAsset(id,date,kind,amount,category,memo);}
