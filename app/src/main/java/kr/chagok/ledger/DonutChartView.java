@@ -16,6 +16,8 @@ import java.util.*;
 final class DonutChartView extends View {
     private final int ink,muted,surface,emptyColor;
     private final Typeface font;
+    private final int[] palette;
+    private final String centerLabel;
     interface Listener {void selected(int index);void rotated(float degrees);}
     private final Listener listener;
     private float rotation,downX,downY,lastAngle,velocity;
@@ -30,11 +32,16 @@ final class DonutChartView extends View {
     private final float density,fontScale;
     static int color(int index){return PALETTE[Math.min(index,PALETTE.length-1)];}
     DonutChartView(Context context,StatisticsData.Summary data,int surface,int ink,int muted,int emptyColor,Typeface font,float rotation,Listener listener){
+        this(context,data,surface,ink,muted,emptyColor,font,rotation,listener,PALETTE,null);
+    }
+    DonutChartView(Context context,StatisticsData.Summary data,int surface,int ink,int muted,int emptyColor,Typeface font,float rotation,Listener listener,int[] palette,String centerLabel){
         super(context);this.data=data;density=getResources().getDisplayMetrics().density;
+        this.palette=palette.length==0?PALETTE:palette.clone();this.centerLabel=centerLabel;
         this.surface=surface;this.ink=ink;this.muted=muted;this.emptyColor=emptyColor;this.font=font;this.rotation=rotation;this.listener=listener;touchSlop=ViewConfiguration.get(context).getScaledTouchSlop();setClickable(true);
         fontScale=getResources().getDisplayMetrics().scaledDensity;
         setContentDescription(data.type+" 분류별 원형 차트, 합계 "+NumberFormat.getIntegerInstance(Locale.KOREA).format(data.total)+"원, "+data.categories.size()+"개 분류");
     }
+    private int chartColor(int index){return palette[Math.min(index,palette.length-1)];}
     private float dp(float value){return value*density;}
     float rotationDegrees(){return rotation;}
     private float radius(){return Math.min(getWidth()*.39f,getHeight()*.46f);}
@@ -81,12 +88,12 @@ final class DonutChartView extends View {
         for(int i=0;i<data.chartCategories.size();i++){
             StatisticsData.Category category=data.chartCategories.get(i);
             float sweep=(float)(category.amount*360.0/data.total);float middle=start+sweep/2;
-            paint.setColor(color(i));canvas.drawArc(bounds,start,sweep,true,paint);boundaries.add(start);
+            paint.setColor(chartColor(i));canvas.drawArc(bounds,start,sweep,true,paint);boundaries.add(start);
             if(sweep>=18){
                 double a=Math.toRadians(middle);float middleRadius=(radius+inner)/2;
                 float available=Math.min(dp(66),(float)(2*middleRadius*Math.sin(Math.toRadians(Math.min(sweep,90)/2))*.84));
                 textPaint.setTextSize(12*fontScale);textPaint.setTextAlign(Paint.Align.CENTER);textPaint.setTypeface(Typeface.create(font,Typeface.BOLD));
-                int c=color(i);double light=(.2126*Color.red(c)+.7152*Color.green(c)+.0722*Color.blue(c))/255;
+                int c=chartColor(i);double light=(.2126*Color.red(c)+.7152*Color.green(c)+.0722*Color.blue(c))/255;
                 textPaint.setColor(light>.7?0xFF424623:Color.WHITE);
                 String label=TextUtils.ellipsize(category.name,textPaint,available,TextUtils.TruncateAt.END).toString();
                 Paint.FontMetrics fm=textPaint.getFontMetrics();canvas.drawText(label,cx+(float)Math.cos(a)*middleRadius,cy+(float)Math.sin(a)*middleRadius-(fm.ascent+fm.descent)/2,textPaint);
@@ -101,6 +108,11 @@ final class DonutChartView extends View {
             start+=sweep;
         }
         paint.setColor(surface);canvas.drawCircle(cx,cy,inner,paint);
+        if(centerLabel!=null){
+            textPaint.setTypeface(Typeface.create(font,Typeface.BOLD));textPaint.setColor(ink);textPaint.setTextSize(13*fontScale);textPaint.setTextAlign(Paint.Align.CENTER);
+            String label=TextUtils.ellipsize(centerLabel,textPaint,inner*1.8f,TextUtils.TruncateAt.END).toString();
+            Paint.FontMetrics fm=textPaint.getFontMetrics();canvas.drawText(label,cx,cy-(fm.ascent+fm.descent)/2,textPaint);
+        }
         paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(5));paint.setColor(0x66FFFFFF);canvas.drawCircle(cx,cy,inner+dp(2.5f),paint);
         if(data.chartCategories.size()>1){paint.setStrokeWidth(dp(1.6f));paint.setColor(surface);for(float angle:boundaries){double a=Math.toRadians(angle);canvas.drawLine(cx+(float)Math.cos(a)*inner,cy+(float)Math.sin(a)*inner,cx+(float)Math.cos(a)*radius,cy+(float)Math.sin(a)*radius,paint);}}
         drawCallouts(canvas,left,w,h);drawCallouts(canvas,right,w,h);

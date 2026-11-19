@@ -1,11 +1,11 @@
 {
   "version": "0.6.2",
   "code": 11,
-  "variant": "",
-  "tag": "v0.6.2",
-  "source": "chagok-source-0.6.2.zip",
-  "source_sha256": "bb96708d4c7dd59b56abaac464b2767107bc9d1a94e3988ce7a648ff7210f8b1",
-  "files": 54,
+  "variant": "-transaction-groups",
+  "tag": "v0.6.2-transaction-groups",
+  "source": "작업-0.6.2-거래분류/chagok-source-0.6.2-거래분류.zip",
+  "source_sha256": "78062e9a2703fb50929dbada8cf64c6c5346291a76fb9c59a4d9d56f97a2a39f",
+  "files": 57,
   "excluded": [
     "local-test.keystore"
   ],

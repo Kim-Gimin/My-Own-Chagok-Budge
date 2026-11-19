@@ -22,6 +22,31 @@ final class StatisticsData {
         }
         double percent(long amount){return total==0?0:amount*100.0/total;}
     }
+    /** Both overview charts use these same positive totals from the selected period. */
+    static final class Comparison {
+        private final long[] amounts;
+        final long total,maximum,outgoing,balance;
+        final Summary chart;
+        Comparison(long[] amounts) {
+            this.amounts=amounts.clone();long sum=0,max=0;
+            List<Category> all=new ArrayList<>(),visible=new ArrayList<>();
+            for(int i=0;i<Ledger.TYPES.length;i++) {
+                sum=Math.addExact(sum,amounts[i]);max=Math.max(max,amounts[i]);
+                Category value=new Category(Ledger.TYPES[i],amounts[i]);all.add(value);if(value.amount>0)visible.add(value);
+            }
+            total=sum;maximum=max;outgoing=Math.addExact(Math.addExact(amounts[1],amounts[2]),amounts[3]);balance=Ledger.available(amounts);
+            chart=new Summary("전체",total,all,visible,0,false);
+        }
+        long amount(int type){return amounts[type];}
+        double percent(int type){return total==0?0:amounts[type]*100.0/total;}
+        double barFraction(int type){return maximum==0?0:amounts[type]/(double)maximum;}
+        boolean hasIncome(){return amounts[0]>0;}
+        double incomePercent(int type){
+            if(!hasIncome())throw new IllegalStateException("수입이 없어 수입 대비 비율을 계산할 수 없어요.");
+            return amounts[type]*100.0/amounts[0];
+        }
+    }
+    static Comparison compare(List<Ledger.Entry> entries){return new Comparison(Ledger.totals(entries));}
     static Summary aggregate(List<Ledger.Entry> entries,String type){
         String kind=Ledger.normalizeType(type);Map<String,Long> groups=new HashMap<>();long total=0;
         for(Ledger.Entry entry:entries)if(entry.type.equals(kind)){

@@ -4,13 +4,14 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import java.util.*;
 
-/** Reusable category choices, kept separately for income, expense and saving. */
+/** Detailed categories, kept separately for each transaction type. */
 final class CategoryStore {
     private final SharedPreferences prefs;
     private static final String[][] DEFAULTS = {
         {"월급", "부수입", "상여금", "용돈", "이자", "기타"},
         {"식비", "카페·간식", "교통", "쇼핑", "생활용품", "주거·통신", "의료·건강", "문화·여가", "교육", "여행", "경조사", "기타"},
-        {"적금", "예금", "비상금", "청약", "기타"}
+        {"적금", "예금", "비상금", "청약", "기타"},
+        {"주식", "ETF", "펀드", "채권", "가상자산", "기타"}
     };
     CategoryStore(Context context) { prefs=context.getSharedPreferences("category_choices",Context.MODE_PRIVATE); }
     List<String> choices(String type,List<Ledger.Entry> entries) {

@@ -8,11 +8,11 @@ import java.util.*;
 final class HistoryData {
     static final int DATE=0,CATEGORY=1;
     static final class Day {
-        final String date;final List<Ledger.Entry> entries=new ArrayList<>();final long[] totals=new long[3];
+        final String date;final List<Ledger.Entry> entries=new ArrayList<>();final long[] totals=new long[Ledger.TYPES.length];
         Day(String date){this.date=date;}
     }
     static final class Month {
-        final YearMonth month;final String category;final List<Day> days=new ArrayList<>();final long[] totals=new long[3];int count;
+        final YearMonth month;final String category;final List<Day> days=new ArrayList<>();final long[] totals=new long[Ledger.TYPES.length];int count;
         Month(YearMonth month,String category){this.month=month;this.category=category;}
     }
     static final class Result {
@@ -24,7 +24,7 @@ final class HistoryData {
         for(Ledger.Entry entry:all)if((month==null||entry.date.startsWith(month.toString()+"-"))&&(type.isEmpty()||entry.type.equals(type))&&(categories.isEmpty()||categories.contains(entry.category))&&(query.isEmpty()||entry.memo.toLowerCase(Locale.KOREA).contains(query)))entries.add(entry);
         Collator collator=Collator.getInstance(Locale.KOREA);
         entries.sort((a,b)->{if(sort==CATEGORY){int c=collator.compare(a.category,b.category);if(c==0)c=a.category.compareTo(b.category);if(c!=0)return c;}return b.date.compareTo(a.date);});
-        List<Month> groups=new ArrayList<>();long[] total=new long[3];Month current=null;Day day=null;
+        List<Month> groups=new ArrayList<>();long[] total=new long[Ledger.TYPES.length];Month current=null;Day day=null;
         for(Ledger.Entry entry:entries){YearMonth yearMonth=YearMonth.from(LocalDate.parse(entry.date));String category=sort==CATEGORY?entry.category:"";
             if(current==null||!current.month.equals(yearMonth)||!current.category.equals(category)){current=new Month(yearMonth,category);groups.add(current);day=null;}
             if(day==null||!day.date.equals(entry.date)){day=new Day(entry.date);current.days.add(day);}

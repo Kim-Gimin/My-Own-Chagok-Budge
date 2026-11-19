@@ -11,7 +11,7 @@ import java.util.*;
 public final class Ledger {
     public static final long MAX_AMOUNT = 999_999_999_999L;
     public static final int MAX_IMPORT_ROWS = 10_000;
-    public static final String[] TYPES = {"수입", "지출", "저축"};
+    public static final String[] TYPES = {"수입", "지출", "저축", "투자"};
     public static final class Entry {
         public final String id, date, type, category, memo;
         public final long amount;
@@ -49,7 +49,8 @@ public final class Ledger {
         if (s.equals("수입") || s.equals("income")) return "수입";
         if (s.equals("지출") || s.equals("expense")) return "지출";
         if (s.equals("저축") || s.equals("saving") || s.equals("savings")) return "저축";
-        throw new IllegalArgumentException("구분은 수입, 지출, 저축 중 하나로 입력하세요.");
+        if (s.equals("투자") || s.equals("investment") || s.equals("investing")) return "투자";
+        throw new IllegalArgumentException("돈의 성격은 수입, 지출, 저축, 투자 중 하나로 입력하세요.");
     }
     public static long parseAmount(String value) {
         try {
@@ -61,12 +62,19 @@ public final class Ledger {
         } catch (Exception ex) { throw new IllegalArgumentException("금액은 1~999,999,999,999원의 정수로 입력하세요."); }
     }
     public static long[] totals(List<Entry> entries) {
-        long[] result = new long[3];
+        long[] result = new long[TYPES.length];
         for (Entry e : entries) result[index(e.type)] = Math.addExact(result[index(e.type)], e.amount);
         return result;
     }
-    public static int index(String type) { return type.equals("수입") ? 0 : type.equals("지출") ? 1 : 2; }
-    public static long available(long[] totals) { return Math.subtractExact(Math.subtractExact(totals[0], totals[1]), totals[2]); }
+    public static int index(String type) {
+        for (int i=0;i<TYPES.length;i++) if (TYPES[i].equals(type)) return i;
+        throw new IllegalArgumentException("알 수 없는 돈의 성격이에요: "+type);
+    }
+    public static long available(long[] totals) {
+        long balance=totals[0];
+        for(int i=1;i<totals.length;i++) balance=Math.subtractExact(balance,totals[i]);
+        return balance;
+    }
     public static List<Entry> month(List<Entry> entries, YearMonth month) {
         List<Entry> out = new ArrayList<>();
         for (Entry e : entries) if (e.date.startsWith(month.toString())) out.add(e);

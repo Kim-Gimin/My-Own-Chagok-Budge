@@ -26,6 +26,92 @@ public final class CoreTests {
     }
     private static byte[] zip(Map<String,String> parts)throws Exception {ByteArrayOutputStream out=new ByteArrayOutputStream();try(ZipOutputStream z=new ZipOutputStream(out)){for(Map.Entry<String,String> p:parts.entrySet()){z.putNextEntry(new ZipEntry(p.getKey()));z.write(p.getValue().getBytes(StandardCharsets.UTF_8));z.closeEntry();}}return out.toByteArray();}
     private static XlsxIO.ReadResult read(byte[] bytes)throws Exception{return XlsxIO.read(new ByteArrayInputStream(bytes));}
+    private static void nearDouble(double expected,double actual){checks++;if(!Double.isFinite(actual)||Math.abs(expected-actual)>1e-9)throw new AssertionError("expected="+expected+", actual="+actual);}
+    private static void comparisonChecks()throws Exception {
+        List<Ledger.Entry> entries=Arrays.asList(entry("old","2025-12-31","수입",1000),entry("i","2026-01-01","수입",3000),entry("e","2026-01-02","지출",1200),entry("s","2026-01-03","저축",600),entry("v","2026-01-04","투자",200),entry("feb","2026-02-01","투자",500),entry("future","2027-01-01","수입",9000));
+        LocalDate today=LocalDate.of(2026,1,3);YearMonth jan=YearMonth.of(2026,1);
+        StatisticsData.Comparison data=StatisticsData.compare(StatisticsPeriod.of(StatisticsPeriod.MONTH,jan,2026,today,today,today).entries(entries));
+        eq(5000L,data.total);eq(3000L,data.maximum);eq(2000L,data.outgoing);eq(1000L,data.balance);eq(true,data.hasIncome());
+        long[] amounts={3000,1200,600,200};double[] shares={60,24,12,4};double sum=0;
+        for(int i=0;i<4;i++){eq(amounts[i],data.amount(i));nearDouble(shares[i],data.percent(i));nearDouble(amounts[i]/3000.0,data.barFraction(i));eq(Ledger.TYPES[i],data.chart.chartCategories.get(i).name);eq(amounts[i],data.chart.chartCategories.get(i).amount);sum+=data.percent(i);}
+        nearDouble(100,sum);eq(data.total,data.chart.total);eq(4,data.chart.categories.size());eq(4,data.chart.chartCategories.size());nearDouble(40,data.incomePercent(1));nearDouble(20,data.incomePercent(2));nearDouble(20000.0/3000,data.incomePercent(3));
+        data=StatisticsData.compare(StatisticsPeriod.of(StatisticsPeriod.YEAR,jan,2026,today,today,today).entries(entries));eq(5500L,data.total);eq(700L,data.amount(3));eq(500L,data.balance);
+        data=StatisticsData.compare(StatisticsPeriod.of(StatisticsPeriod.YTD,jan,2026,today,today,today).entries(entries));eq(4800L,data.total);eq(0L,data.amount(3));eq(3,data.chart.chartCategories.size());eq(1200L,data.balance);
+        data=StatisticsData.compare(StatisticsPeriod.of(StatisticsPeriod.CUSTOM,jan,2026,LocalDate.of(2025,12,31),LocalDate.of(2026,1,1),today).entries(entries));eq(4000L,data.total);eq(1,data.chart.chartCategories.size());eq("수입",data.chart.chartCategories.get(0).name);nearDouble(100,data.percent(0));
+        final StatisticsData.Comparison noIncome=StatisticsData.compare(StatisticsPeriod.of(StatisticsPeriod.CUSTOM,jan,2026,LocalDate.of(2026,1,2),LocalDate.of(2026,1,4),today).entries(entries));eq(false,noIncome.hasIncome());eq(2000L,noIncome.total);eq(-2000L,noIncome.balance);eq(2000L,noIncome.outgoing);nearDouble(60,noIncome.percent(1));nearDouble(30,noIncome.percent(2));nearDouble(10,noIncome.percent(3));rejects(()->noIncome.incomePercent(1));
+        final StatisticsData.Comparison empty=StatisticsData.compare(Collections.emptyList());eq(0L,empty.total);eq(0L,empty.maximum);eq(0L,empty.balance);eq(4,empty.chart.categories.size());eq(0,empty.chart.chartCategories.size());eq(false,empty.hasIncome());for(int i=0;i<4;i++){nearDouble(0,empty.percent(i));nearDouble(0,empty.barFraction(i));}rejects(()->empty.incomePercent(2));
+        data=StatisticsData.compare(Collections.singletonList(entry("only-investment","2026-01-01","투자",500)));eq(1,data.chart.chartCategories.size());eq("투자",data.chart.chartCategories.get(0).name);nearDouble(100,data.percent(3));nearDouble(1,data.barFraction(3));eq(-500L,data.balance);
+        data=StatisticsData.compare(Arrays.asList(entry("i","2026-01-01","수입",100),entry("e","2026-01-01","지출",300)));nearDouble(300,data.incomePercent(1));nearDouble(75,data.percent(1));eq(-200L,data.balance);
+        List<Ledger.Entry> large=new ArrayList<>();for(String type:Ledger.TYPES)large.add(entry(type,"2026-01-01",type,Ledger.MAX_AMOUNT));data=StatisticsData.compare(large);eq(4*Ledger.MAX_AMOUNT,data.total);eq(3*Ledger.MAX_AMOUNT,data.outgoing);eq(-2*Ledger.MAX_AMOUNT,data.balance);for(int i=0;i<4;i++){nearDouble(25,data.percent(i));nearDouble(1,data.barFraction(i));}
+        eq(1200L,StatisticsData.aggregate(entries,"지출").total);eq(600L,StatisticsData.aggregate(entries,"저축").total);eq(700L,StatisticsData.aggregate(entries,"투자").total);
+    }
+    private static Map<String,String> unzip(byte[] bytes)throws Exception {
+        Map<String,String> parts=new HashMap<>();
+        try(ZipInputStream zip=new ZipInputStream(new ByteArrayInputStream(bytes),StandardCharsets.UTF_8)) {
+            ZipEntry entry;byte[] buffer=new byte[8192];
+            while((entry=zip.getNextEntry())!=null) {ByteArrayOutputStream out=new ByteArrayOutputStream();int n;while((n=zip.read(buffer))!=-1)out.write(buffer,0,n);parts.put(entry.getName(),new String(out.toByteArray(),StandardCharsets.UTF_8));}
+        }
+        return parts;
+    }
+    private static byte[] export(List<Ledger.Entry> entries,boolean template)throws Exception {ByteArrayOutputStream out=new ByteArrayOutputStream();XlsxIO.write(out,entries,template);return out.toByteArray();}
+    private static String cached(String xml,String address) {
+        java.util.regex.Matcher m=java.util.regex.Pattern.compile("<c r=\""+address+"\"[^>]*>.*?<v>(.*?)</v></c>").matcher(xml);
+        if(!m.find()) throw new AssertionError("Missing numeric cell "+address);return m.group(1);
+    }
+    private static String signedHeaders(){return "<row r=\"1\">"+s("A1","날짜")+s("B1","내역")+s("C1","상세 분류")+s("D1","돈의 성격")+s("E1","금액")+s("F1","계좌")+s("G1","고유ID")+"</row>";}
+    private static String signedRow(String type,String amount){return "<row r=\"2\">"+s("A2","2026-10-01")+s("B2","월급과 주식")+s("C2","상세")+s("D2",type)+s("E2",amount)+s("F2","무시할 계좌")+s("G2","signed-id")+"</row>";}
+    private static void typeAndExportChecks()throws Exception {
+        eq("투자",Ledger.normalizeType(" INVESTMENT "));eq("투자",Ledger.normalizeType("investing"));eq(3,Ledger.index("투자"));rejects(()->Ledger.index("이체"));
+        eq("수입",TransactionType.classify(null,"예금 이자 내계좌 ETF",false));eq("이체",TransactionType.classify("","내 계좌 적금 ETF",false));
+        eq("저축",TransactionType.classify(null,"Cma 정기 예금",false));eq("투자",TransactionType.classify(null,"etf 매수",false));eq("투자",TransactionType.classify(null,"증권 펀드",false));
+        eq("수입",TransactionType.classify(null,"알 수 없는 입금",true));eq("지출",TransactionType.classify(null,"알 수 없는 출금",false));
+        eq("지출",TransactionType.classify("지출","월급 급여",true));eq("저축",TransactionType.classify("저축","ETF 주식",false));eq("투자",TransactionType.classify("투자","월급 환급",true));
+        eq("수입",TransactionType.classify(null,"캐시백 청약",false));eq("수입",TransactionType.classify(null,"상여 적금",false));
+        List<Ledger.Entry> entries=Arrays.asList(
+            new Ledger.Entry("income","2026-10-01","수입",3000000,"월급","적금",0),
+            new Ledger.Entry("expense","2026-10-02","지출",500000,"식비","급여",0),
+            new Ledger.Entry("saving","2026-10-03","저축",700000,"주식","기존 구분 유지",0),
+            new Ledger.Entry("investment","2026-10-04","투자",400000,"ETF","정기 매수",0));
+        long[] totals=Ledger.totals(entries);eq(4,totals.length);eq(3000000L,totals[0]);eq(500000L,totals[1]);eq(700000L,totals[2]);eq(400000L,totals[3]);eq(1400000L,Ledger.available(totals));
+        eq(3000000L,TransactionType.signedAmount(entries.get(0)));for(int i=1;i<4;i++)eq(-entries.get(i).amount,TransactionType.signedAmount(entries.get(i)));
+        HistoryData.Result history=HistoryData.build(entries,null,"투자","",Collections.emptySet(),HistoryData.DATE);eq(1,history.entries.size());eq(-400000L,Ledger.available(history.totals));eq(400000L,history.months.get(0).days.get(0).totals[3]);
+        history=HistoryData.build(entries,null,"","",Collections.emptySet(),HistoryData.CATEGORY);eq(1400000L,Ledger.available(history.totals));
+        OverviewData.Settlement settlement=OverviewData.settle(entries,null,null);eq(1400000L,settlement.balance());eq(400000L,settlement.months.get(0).totals[3]);
+        Map<String,Long> metrics=new HashMap<>();for(OverviewData.Metric m:OverviewData.metrics(entries,LocalDate.of(2026,10,4)))metrics.put(m.id,m.amount);eq(25,metrics.size());eq(1400000L,metrics.get("all_3"));eq(400000L,metrics.get("all_4"));eq(400000L,metrics.get("today_4"));
+        eq(500000L,StatisticsData.aggregate(entries,"지출").total);eq(700000L,StatisticsData.aggregate(entries,"저축").total);eq(400000L,StatisticsData.aggregate(entries,"투자").total);eq("ETF",StatisticsData.aggregate(entries,"투자").categories.get(0).name);
+        byte[] bytes=export(entries,false);Map<String,String> parts=unzip(bytes);String book=parts.get("xl/workbook.xml"),detail=parts.get("xl/worksheets/sheet2.xml"),summary=parts.get("xl/worksheets/sheet1.xml");
+        eq(true,book.indexOf("name=\"요약\"")<book.indexOf("name=\"내역\""));eq(true,book.indexOf("name=\"내역\"")<book.indexOf("name=\"사용 안내\""));
+        String[] labels={"날짜","내역","상세 분류","돈의 성격","금액","계좌","고유ID"};for(int i=0;i<labels.length;i++)eq(true,detail.contains(s((char)('A'+i)+"1",labels[i]).replace(" t=\"inlineStr\""," t=\"inlineStr\" s=\"1\"").replace("<t>","<t xml:space=\"preserve\">")));
+        eq("3000000",cached(detail,"E2"));eq("-500000",cached(detail,"E3"));eq("-700000",cached(detail,"E4"));eq("-400000",cached(detail,"E5"));eq(true,detail.contains("A1:G5"));
+        eq(true,detail.contains("sqref=\"D2:D10001\""));eq(true,detail.contains("errorStyle=\"stop\""));eq(true,detail.contains("showDropDown=\"0\""));eq(true,detail.contains("수입,지출,저축,투자"));
+        eq(true,detail.contains("r=\"F2\" t=\"inlineStr\" s=\"0\"><is><t xml:space=\"preserve\"></t>"));eq(true,parts.get("xl/styles.xml").contains("+#,##0;-#,##0;0"));
+        eq("3000000",cached(summary,"B3"));eq("500000",cached(summary,"B4"));eq("700000",cached(summary,"B5"));eq("400000",cached(summary,"B6"));eq("1400000",cached(summary,"B7"));eq(true,summary.contains("B3-B4-B5-B6"));eq(true,summary.contains("IF(B3&gt;0,B5/B3,0)"));eq(true,summary.contains("2026-10-01 ~ 2026-10-04"));
+        eq(true,Math.abs(700000.0/3000000-Double.parseDouble(cached(summary,"B8")))<1e-15);
+        XlsxIO.ReadResult read=read(bytes);eq(0,read.invalidRows);eq(4,read.entries.size());for(int i=0;i<4;i++){eq(entries.get(i).id,read.entries.get(i).id);eq(entries.get(i).fingerprint(),read.entries.get(i).fingerprint());}
+        eq(4,Ledger.planImport(read.entries,entries).duplicates);eq(0,Ledger.planImport(read.entries,entries).additions.size());
+        List<Ledger.Entry> noIds=new ArrayList<>();for(Ledger.Entry e:read.entries)noIds.add(e.withId(""));eq(4,Ledger.planImport(noIds,entries).duplicates);
+        eq(1,Ledger.planImport(Collections.singletonList(new Ledger.Entry("investment","2026-10-04","저축",400000,"ETF","정기 매수",0)),entries).errors.size());
+        parts=unzip(export(Collections.emptyList(),false));summary=parts.get("xl/worksheets/sheet1.xml");eq(true,summary.contains("기록 없음"));for(int r=3;r<=8;r++)eq("0",cached(summary,"B"+r));eq(0,read(export(Collections.emptyList(),false)).entries.size());
+        parts=unzip(export(Collections.emptyList(),true));eq(false,parts.get("xl/workbook.xml").contains("name=\"요약\""));eq(true,parts.get("xl/worksheets/sheet1.xml").contains("수입,지출,저축,투자"));eq(true,parts.get("xl/worksheets/sheet1.xml").contains("돈의 성격"));
+        eq(true,parts.get("xl/worksheets/sheet1.xml").contains("sqref=\"D2:D10001\""));
+        eq(true,parts.get("xl/worksheets/sheet1.xml").contains("A1:G1"));
+        Map<String,String> filledTemplate=unzip(export(entries,true));
+        for(int i=0;i<4;i++)eq(Long.toString(TransactionType.signedAmount(entries.get(i))),cached(filledTemplate.get("xl/worksheets/sheet1.xml"),"E"+(i+2)));
+        eq(4,read(export(entries,true)).entries.size());eq(0,read(export(entries,true)).invalidRows);
+        for(int i=0;i<4;i++)eq(entries.get(i).fingerprint(),read(export(entries,true)).entries.get(i).fingerprint());
+        read=read(fixture(signedHeaders()+signedRow("투자","-1,234"),false,null));eq(0,read.invalidRows);eq("투자",read.entries.get(0).type);eq(1234L,read.entries.get(0).amount);eq("상세",read.entries.get(0).category);eq("월급과 주식",read.entries.get(0).memo);
+        read=read(fixture(signedHeaders().replace("돈의 성격","거래유형").replace("상세 분류","카테고리")+signedRow("투자","-4000"),false,null));eq(0,read.invalidRows);eq(4000L,read.entries.get(0).amount);
+        for(String type:Ledger.TYPES) {
+            for(String amount:(type.equals("수입")?new String[]{"1","+1000","999999999999"}:new String[]{"-1","-1E3","-999999999999"}))eq(0,read(fixture(signedHeaders()+signedRow(type,amount),false,null)).invalidRows);
+            for(String amount:(type.equals("수입")?new String[]{"-1","0","1.5","1000000000000",""}:new String[]{"1","0","-1.5","-1000000000000",""}))eq(1,read(fixture(signedHeaders()+signedRow(type,amount),false,null)).invalidRows);
+        }
+        eq(1,read(fixture(signedHeaders()+signedRow("이체","-100"),false,null)).invalidRows);eq(1,read(fixture(signedHeaders()+signedRow("없는 유형","-100"),false,null)).invalidRows);
+        for(String amount:new String[]{"-1E999999999","-1E-999999999"})eq(1,read(fixture(signedHeaders()+signedRow("투자",amount),false,null)).invalidRows);
+        String legacy=headers()+"<row r=\"2\">"+s("A2","2026-10-01")+s("B2","투자")+s("C2","100")+s("D2","ETF")+"</row>";
+        eq("투자",read(fixture(legacy,false,null)).entries.get(0).type);eq(1,read(fixture(legacy.replace(">100<",">-100<"),false,null)).invalidRows);
+        eq(1,read(fixture(signedHeaders()+signedRow("투자","-100").replace("<is><t>-100</t></is>","<f>-50*2</f><v>-100</v>"),false,null)).invalidRows);
+        rejects(()->read(fixture(signedHeaders().replace(s("F1","계좌"),s("F1","메모"))+signedRow("수입","100"),false,null)));
+    }
     private static void historyChecks()throws Exception{
         List<Ledger.Entry> entries=Arrays.asList(new Ledger.Entry("a","2025-12-31","수입",1000,"급여","급여 입금",0),new Ledger.Entry("b","2026-01-01","지출",100,"식비","점심 커피",0),new Ledger.Entry("c","2026-01-01","저축",200,"적금","매월 저축",0),new Ledger.Entry("d","2026-02-01","지출",50,"교통","BUS 교통비",0),new Ledger.Entry("e","2026-02-02","지출",70,"식비","",0));
         HistoryData.Result data=HistoryData.build(entries,null,"","",Collections.emptySet(),0);eq(5,data.entries.size());eq(580L,Ledger.available(data.totals));eq(3,data.months.size());eq(YearMonth.of(2026,2),data.months.get(0).month);eq(-120L,Ledger.available(data.months.get(0).totals));eq(-300L,Ledger.available(data.months.get(1).days.get(0).totals));eq("e",data.entries.get(0).id);
@@ -52,7 +138,7 @@ public final class CoreTests {
         List<Ledger.Entry> entries=Arrays.asList(entry("a","2025-12-31","수입",1000),entry("b","2026-01-01","저축",100),entry("c","2026-01-02","지출",50),entry("d","2026-01-04","수입",500),entry("e","2026-01-05","지출",20),entry("f","2026-02-01","지출",30));
         OverviewData.Settlement all=OverviewData.settle(entries,null,null);eq(3,all.months.size());eq(YearMonth.of(2026,2),all.months.get(0).month);eq(1300L,all.balance());
         OverviewData.Settlement jan=OverviewData.settle(entries,YearMonth.of(2026,1),YearMonth.of(2026,1));eq(1,jan.months.size());eq(330L,jan.balance());eq(100L,jan.totals[2]);eq(-30L,OverviewData.settle(entries,YearMonth.of(2026,2),YearMonth.of(2026,12)).balance());rejects(()->OverviewData.settle(entries,YearMonth.of(2027,1),YearMonth.of(2026,12)));
-        Map<String,Long> metrics=new HashMap<>();for(OverviewData.Metric m:OverviewData.metrics(entries,LocalDate.of(2026,1,4)))metrics.put(m.id,m.amount);eq(20,metrics.size());eq(500L,metrics.get("today_3"));eq(1350L,metrics.get("week_3"));eq(330L,metrics.get("month_3"));eq(300L,metrics.get("year_3"));eq(1300L,metrics.get("all_3"));metrics.clear();for(OverviewData.Metric m:OverviewData.metrics(entries,LocalDate.of(2026,1,5)))metrics.put(m.id,m.amount);eq(-20L,metrics.get("week_3"));eq(0,OverviewData.settle(Collections.emptyList(),null,null).months.size());
+        Map<String,Long> metrics=new HashMap<>();for(OverviewData.Metric m:OverviewData.metrics(entries,LocalDate.of(2026,1,4)))metrics.put(m.id,m.amount);eq(25,metrics.size());eq(500L,metrics.get("today_3"));eq(1350L,metrics.get("week_3"));eq(330L,metrics.get("month_3"));eq(300L,metrics.get("year_3"));eq(1300L,metrics.get("all_3"));metrics.clear();for(OverviewData.Metric m:OverviewData.metrics(entries,LocalDate.of(2026,1,5)))metrics.put(m.id,m.amount);eq(-20L,metrics.get("week_3"));eq(0,OverviewData.settle(Collections.emptyList(),null,null).months.size());
     }
     private static void near(float expected,float actual){checks++;if(Math.abs(expected-actual)>0.001f)throw new AssertionError("expected="+expected+", actual="+actual);}
     private static void iconGeometryChecks(){
@@ -73,6 +159,8 @@ public final class CoreTests {
         eq(true,IconGeometry.GEAR_HOLE>1.5f&&IconGeometry.GEAR_HOLE+0.9f<IconGeometry.GEAR_ROOT-0.9f);
     }
     public static void main(String[] args)throws Exception {
+        comparisonChecks();
+        typeAndExportChecks();
         overviewChecks();
         periodChecks();
         iconGeometryChecks();
@@ -117,7 +205,16 @@ public final class CoreTests {
         for(int i=0;i<10000;i++)many.add(new Ledger.Entry("id-"+i,"2026-10-27","지출",1234,"식비",memo,i+2));
         result=roundtrip(many);eq(10000,result.entries.size());eq(0,result.invalidRows);eq(memo,result.entries.get(9999).memo);
         many.add(entry("extra","2026-10-27","수입",1));rejects(()->roundtrip(many));
-        if(args.length>0){result=XlsxIO.read(Files.newInputStream(Paths.get(args[0])));eq(0,result.invalidRows);eq(3,result.entries.size());eq(3000000L,Ledger.totals(result.entries)[0]);eq(1000000L,Ledger.totals(result.entries)[2]);}
+        if(args.length>0){try(InputStream input=Files.newInputStream(Paths.get(args[0]))){result=XlsxIO.read(input);eq(0,result.invalidRows);eq(true,result.entries.size()==3||result.entries.size()==4);eq(3000000L,Ledger.totals(result.entries)[0]);eq(1000000L,Ledger.totals(result.entries)[2]);eq(result.entries.size()==4?400000L:0L,Ledger.totals(result.entries)[3]);}}
+        if(args.length>1) {
+            try(InputStream input=Files.newInputStream(Paths.get(args[1]))) {
+                result=XlsxIO.read(input);eq(0,result.invalidRows);eq(4,result.entries.size());
+                long[] templateTotals=Ledger.totals(result.entries);eq(3000000L,templateTotals[0]);eq(12500L,templateTotals[1]);eq(1000000L,templateTotals[2]);eq(400000L,templateTotals[3]);eq(1587500L,Ledger.available(templateTotals));
+                eq("월급",result.entries.get(0).category);eq("식비",result.entries.get(1).category);eq("적금",result.entries.get(2).category);eq("ETF",result.entries.get(3).category);
+                for(Ledger.Entry e:result.entries)eq("",e.id);
+                eq(4,Ledger.planImport(result.entries,result.entries).duplicates);
+            }
+        }
         StatisticsData.Summary stats=StatisticsData.aggregate(data,"지출");eq(500000L,stats.total);eq(1,stats.categories.size());eq(100.0,stats.percent(500000));
         stats=StatisticsData.aggregate(Collections.emptyList(),"저축");eq(0L,stats.total);eq(0.0,stats.percent(0));eq(0,stats.chartCategories.size());
         List<Ledger.Entry> statisticsInput=new ArrayList<>();

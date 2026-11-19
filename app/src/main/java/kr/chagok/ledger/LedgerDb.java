@@ -6,12 +6,24 @@ import android.database.sqlite.*;
 import java.util.*;
 
 final class LedgerDb extends SQLiteOpenHelper {
-    LedgerDb(Context context) { super(context, "chagok.db", null, 1); }
+    LedgerDb(Context context) { super(context, "chagok.db", null, 2); }
     @Override public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE entries (id TEXT PRIMARY KEY NOT NULL, date TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('수입','지출','저축')), amount INTEGER NOT NULL CHECK(amount>0 AND amount<=999999999999), category TEXT NOT NULL, memo TEXT NOT NULL)");
+        createEntries(db,"entries");
         db.execSQL("CREATE INDEX entries_date ON entries(date)");
     }
-    @Override public void onUpgrade(SQLiteDatabase db, int from, int to) { throw new IllegalStateException("지원하지 않는 데이터 버전입니다."); }
+    private static void createEntries(SQLiteDatabase db,String table) {
+        db.execSQL("CREATE TABLE "+table+" (id TEXT PRIMARY KEY NOT NULL, date TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('수입','지출','저축','투자')), amount INTEGER NOT NULL CHECK(amount>0 AND amount<=999999999999), category TEXT NOT NULL, memo TEXT NOT NULL)");
+    }
+    @Override public void onUpgrade(SQLiteDatabase db, int from, int to) {
+        if(from==1 && to==2) {
+            // SQLiteOpenHelper runs this upgrade in a transaction. Keep IDs and row order.
+            createEntries(db,"entries_next");
+            db.execSQL("INSERT INTO entries_next (rowid,id,date,type,amount,category,memo) SELECT rowid,id,date,type,amount,category,memo FROM entries");
+            db.execSQL("DROP TABLE entries");
+            db.execSQL("ALTER TABLE entries_next RENAME TO entries");
+            db.execSQL("CREATE INDEX entries_date ON entries(date)");
+        } else throw new IllegalStateException("지원하지 않는 데이터 버전입니다.");
+    }
     List<Ledger.Entry> all() {
         List<Ledger.Entry> result = new ArrayList<>();
         try (Cursor c = getReadableDatabase().query("entries", null, null, null, null, null, "date DESC, rowid DESC")) {

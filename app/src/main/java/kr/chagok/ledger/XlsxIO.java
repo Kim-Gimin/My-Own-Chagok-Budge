@@ -17,7 +17,8 @@ public final class XlsxIO {
     private static final String NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     private static final String REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     private static final int MAX_XML = 32 * 1024 * 1024, MAX_TOTAL = 64 * 1024 * 1024;
-    private static final String[] HEADERS = {"날짜", "구분", "금액", "분류", "메모", "고유ID"};
+    private static final String[] BACKUP_HEADERS = {"날짜", "내역", "상세 분류", "돈의 성격", "금액", "계좌", "고유ID"};
+    private static final String STYLES = "<?xml version=\"1.0\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><numFmts count=\"4\"><numFmt numFmtId=\"164\" formatCode=\"yyyy-mm-dd\"/><numFmt numFmtId=\"165\" formatCode=\"#,##0\"/><numFmt numFmtId=\"166\" formatCode=\"+#,##0;-#,##0;0\"/><numFmt numFmtId=\"167\" formatCode=\"0.0%\"/></numFmts><fonts count=\"3\"><font><sz val=\"11\"/><name val=\"맑은 고딕\"/></font><font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"맑은 고딕\"/></font><font><b/><sz val=\"11\"/><name val=\"맑은 고딕\"/></font></fonts><fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF19765B\"/><bgColor indexed=\"64\"/></patternFill></fill></fills><borders count=\"1\"><border/></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"7\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\"/><xf numFmtId=\"164\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"165\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"166\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"167\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/></cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles></styleSheet>";
     public static final class ReadResult {
         public final List<Ledger.Entry> entries = new ArrayList<>();
         public final List<String> errors = new ArrayList<>();
@@ -26,34 +27,87 @@ public final class XlsxIO {
     public static void write(OutputStream output, List<Ledger.Entry> input, boolean template) throws IOException {
         List<Ledger.Entry> entries = new ArrayList<>(input);
         entries.sort(Comparator.comparing((Ledger.Entry e) -> e.date).thenComparing(e -> e.id));
-        if (entries.size() > Ledger.MAX_IMPORT_ROWS) throw new IOException("한 파일에 최대 10,000건을 저장할 수 있어요. 기간을 나누어 백업해 주세요.");
-        try (ZipOutputStream zip = new ZipOutputStream(output, StandardCharsets.UTF_8)) {
-            put(zip,"[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/worksheets/sheet2.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/></Types>");
-            put(zip,"_rels/.rels", "<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\""+REL+"/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>");
-            put(zip,"xl/workbook.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><workbook xmlns=\""+NS+"\" xmlns:r=\""+REL+"\"><sheets><sheet name=\"내역\" sheetId=\"1\" r:id=\"rId1\"/><sheet name=\"사용 안내\" sheetId=\"2\" r:id=\"rId2\"/></sheets></workbook>");
-            put(zip,"xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\""+REL+"/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\""+REL+"/worksheet\" Target=\"worksheets/sheet2.xml\"/><Relationship Id=\"rId3\" Type=\""+REL+"/styles\" Target=\"styles.xml\"/></Relationships>");
-            put(zip,"xl/styles.xml", "<?xml version=\"1.0\"?><styleSheet xmlns=\""+NS+"\"><numFmts count=\"2\"><numFmt numFmtId=\"164\" formatCode=\"yyyy-mm-dd\"/><numFmt numFmtId=\"165\" formatCode=\"#,##0\"/></numFmts><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"맑은 고딕\"/></font><font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"맑은 고딕\"/></font></fonts><fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF19765B\"/><bgColor indexed=\"64\"/></patternFill></fill></fills><borders count=\"1\"><border/></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"4\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\"/><xf numFmtId=\"164\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"165\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/></cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles></styleSheet>");
-            StringBuilder sheet = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews><cols><col min=\"1\" max=\"1\" width=\"16\" customWidth=\"1\"/><col min=\"2\" max=\"2\" width=\"12\" customWidth=\"1\"/><col min=\"3\" max=\"3\" width=\"20\" customWidth=\"1\"/><col min=\"4\" max=\"4\" width=\"22\" customWidth=\"1\"/><col min=\"5\" max=\"5\" width=\"52\" customWidth=\"1\"/><col min=\"6\" max=\"6\" width=\"40\" customWidth=\"1\"/></cols><sheetData><row r=\"1\" ht=\"28\" customHeight=\"1\">");
-            for (int c=0;c<HEADERS.length;c++) sheet.append(textCell(col(c)+"1",HEADERS[c],1));
-            sheet.append("</row>");
-            int r=2;
-            for (Ledger.Entry entry : entries) {
-                sheet.append("<row r=\"").append(r).append("\">");
-                sheet.append("<c r=\"A").append(r).append("\" s=\"2\"><v>").append(excelSerial(LocalDate.parse(entry.date))).append("</v></c>");
-                sheet.append(textCell("B"+r,entry.type,0));
-                sheet.append("<c r=\"C").append(r).append("\" s=\"3\"><v>").append(entry.amount).append("</v></c>");
-                sheet.append(textCell("D"+r,entry.category,0)).append(textCell("E"+r,entry.memo,0)).append(textCell("F"+r,entry.id,0)).append("</row>");
-                r++;
+        if(entries.size()>Ledger.MAX_IMPORT_ROWS) throw new IOException("한 파일에 최대 10,000건을 저장할 수 있어요. 기간을 나누어 백업해 주세요.");
+        String[] names=template?new String[]{"내역","사용 안내"}:new String[]{"요약","내역","사용 안내"};
+        try(ZipOutputStream zip=new ZipOutputStream(output,StandardCharsets.UTF_8)) {
+            StringBuilder types=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>");
+            StringBuilder book=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><workbook xmlns=\""+NS+"\" xmlns:r=\""+REL+"\"><sheets>");
+            StringBuilder rels=new StringBuilder("<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">");
+            for(int i=0;i<names.length;i++) {
+                int n=i+1;
+                types.append("<Override PartName=\"/xl/worksheets/sheet").append(n).append(".xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>");
+                book.append("<sheet name=\"").append(names[i]).append("\" sheetId=\"").append(n).append("\" r:id=\"rId").append(n).append("\"/>");
+                rels.append("<Relationship Id=\"rId").append(n).append("\" Type=\"").append(REL).append("/worksheet\" Target=\"worksheets/sheet").append(n).append(".xml\"/>");
             }
-            sheet.append("</sheetData><autoFilter ref=\"A1:F").append(Math.max(1,r-1)).append("\"/>");
-            if (template) sheet.append("<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"0\" showErrorMessage=\"1\" sqref=\"B2:B10001\"><formula1>&quot;수입,지출,저축&quot;</formula1></dataValidation></dataValidations>");
-            sheet.append("</worksheet>");
-            put(zip,"xl/worksheets/sheet1.xml",sheet.toString());
-            String[] notes = {"차곡가계부 엑셀 사용 안내", "내역 시트의 첫 번째 행은 바꾸지 말고, 두 번째 행부터 입력하세요.", "날짜: YYYY-MM-DD 문자 또는 엑셀 날짜 셀 / 구분: 수입, 지출, 저축", "금액: 1~999,999,999,999원의 정수. 분류와 메모는 생략할 수 있어요.", "새 내역의 고유ID는 비워 두세요. 백업 파일의 ID는 복원 시 중복을 확인하는 데 사용해요.", "ID가 없으면 날짜·구분·금액·분류·메모가 모두 같은 내역을 중복으로 보아요.", "백업 내역의 내용을 수정한 뒤 같은 ID로 가져오면 충돌로 표시돼요. 기존 내역 수정은 앱에서 해 주세요.", "수식은 값으로 붙여 넣은 뒤 저장해 주세요. .xlsx만 지원해요. .xls는 .xlsx로 다시 저장하세요.", "가져오기는 최대 10,000건. 오류가 있으면 전체를 추가하지 않으며, 기존 내역은 지우지 않아요.", "사용 가능 금액 = 수입 − 지출 − 저축. 저축은 지출 통계에 포함하지 않아요.", "앱 삭제 시 휴대폰 내 기록도 삭제돼요. 백업 파일은 휴대폰 밖에도 보관해 주세요."};
-            StringBuilder guide = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><cols><col min=\"1\" max=\"1\" width=\"110\" customWidth=\"1\"/></cols><sheetData>");
-            for(int i=0;i<notes.length;i++) guide.append("<row r=\"").append(i+1).append("\" ht=\"28\" customHeight=\"1\">").append(textCell("A"+(i+1),notes[i],i==0?1:0)).append("</row>");
-            put(zip,"xl/worksheets/sheet2.xml",guide.append("</sheetData></worksheet>").toString());
+            rels.append("<Relationship Id=\"rId").append(names.length+1).append("\" Type=\"").append(REL).append("/styles\" Target=\"styles.xml\"/>");
+            put(zip,"[Content_Types].xml",types.append("</Types>").toString());
+            put(zip,"_rels/.rels","<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\""+REL+"/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>");
+            put(zip,"xl/workbook.xml",book.append("</sheets><calcPr calcId=\"0\" fullCalcOnLoad=\"1\"/></workbook>").toString());
+            put(zip,"xl/_rels/workbook.xml.rels",rels.append("</Relationships>").toString());
+            put(zip,"xl/styles.xml",STYLES);
+            if(!template) put(zip,"xl/worksheets/sheet1.xml",summarySheet(entries));
+            put(zip,"xl/worksheets/sheet"+(template?1:2)+".xml",detailSheet(entries,template));
+            put(zip,"xl/worksheets/sheet"+names.length+".xml",guideSheet());
         }
+    }
+    private static String detailSheet(List<Ledger.Entry> entries,boolean template) {
+        String[] headers=BACKUP_HEADERS;
+        int[] widths={16,52,24,18,22,22,40};
+        StringBuilder sheet=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews><cols>");
+        for(int c=0;c<widths.length;c++) sheet.append("<col min=\"").append(c+1).append("\" max=\"").append(c+1).append("\" width=\"").append(widths[c]).append("\" customWidth=\"1\"/>");
+        sheet.append("</cols><sheetData><row r=\"1\" ht=\"28\" customHeight=\"1\">");
+        for(int c=0;c<headers.length;c++) sheet.append(textCell(col(c)+"1",headers[c],1));
+        sheet.append("</row>");int r=2;
+        for(Ledger.Entry entry:entries) {
+            sheet.append("<row r=\"").append(r).append("\">").append(numberCell("A"+r,Long.toString(excelSerial(LocalDate.parse(entry.date))),2));
+            sheet.append(textCell("B"+r,entry.memo,0)).append(textCell("C"+r,entry.category,0)).append(textCell("D"+r,TransactionType.of(entry),0));
+            sheet.append(numberCell("E"+r,Long.toString(TransactionType.signedAmount(entry)),4)).append(textCell("F"+r,"",0)).append(textCell("G"+r,entry.id,0));
+            sheet.append("</row>");r++;
+        }
+        sheet.append("</sheetData><autoFilter ref=\"A1:").append(col(headers.length-1)).append(Math.max(1,r-1)).append("\"/>");
+        sheet.append("<dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"0\" showDropDown=\"0\" errorStyle=\"stop\" showErrorMessage=\"1\" errorTitle=\"돈의 성격 선택\" error=\"수입, 지출, 저축, 투자 중 하나를 선택하세요.\" sqref=\"D2:D10001\"><formula1>&quot;수입,지출,저축,투자&quot;</formula1></dataValidation></dataValidations>");
+        return sheet.append("</worksheet>").toString();
+    }
+    private static String summarySheet(List<Ledger.Entry> entries) {
+        long[] totals=Ledger.totals(entries);int end=Math.max(2,entries.size()+1);
+        String period=entries.isEmpty()?"기록 없음":entries.get(0).date+" ~ "+entries.get(entries.size()-1).date;
+        StringBuilder sheet=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><cols><col min=\"1\" max=\"1\" width=\"28\" customWidth=\"1\"/><col min=\"2\" max=\"2\" width=\"62\" customWidth=\"1\"/></cols><sheetData>");
+        sheet.append("<row r=\"1\">").append(textCell("A1","차곡가계부 요약",6)).append("</row><row r=\"2\">").append(textCell("A2","기간",6)).append(textCell("B2",period,0)).append("</row>");
+        for(int i=0;i<Ledger.TYPES.length;i++) {
+            int r=3+i;
+            String formula=(i==0?"":"-")+"SUMIFS('내역'!$E$2:$E$"+end+",'내역'!$D$2:$D$"+end+",\""+Ledger.TYPES[i]+"\")";
+            sheet.append("<row r=\"").append(r).append("\">").append(textCell("A"+r,"총"+Ledger.TYPES[i],6)).append(formulaCell("B"+r,formula,Long.toString(totals[i]),3)).append("</row>");
+        }
+        String rate=totals[0]==0?"0":BigDecimal.valueOf(totals[2]).divide(BigDecimal.valueOf(totals[0]),java.math.MathContext.DECIMAL64).toPlainString();
+        sheet.append("<row r=\"7\">").append(textCell("A7","남은 돈",6)).append(formulaCell("B7","B3-B4-B5-B6",Long.toString(Ledger.available(totals)),3)).append("</row>");
+        sheet.append("<row r=\"8\">").append(textCell("A8","저축률",6)).append(formulaCell("B8","IF(B3>0,B5/B3,0)",rate,5)).append("</row>");
+        String[] notes={"돈의 성격: 수입·지출·저축·투자 / 상세 분류: 월급·식비·적금·주식 등", "저축과 투자, 이체는 지출 합계에 포함하지 않아요. 앱에는 이체 기록이 없어요.", "남은 돈 = 수입 − 지출 − 저축 − 투자. 저축률에는 저축만 포함해요.", "기존에 저장한 돈의 성격을 그대로 내보내며, 상세 분류로 자동 변경하지 않아요."};
+        for(int i=0;i<notes.length;i++) sheet.append("<row r=\"").append(i+10).append("\">").append(textCell("A"+(i+10),notes[i],0)).append("</row>");
+        return sheet.append("</sheetData></worksheet>").toString();
+    }
+    private static String numberCell(String address,String value,int style) { return "<c r=\""+address+"\" s=\""+style+"\"><v>"+value+"</v></c>"; }
+    private static String formulaCell(String address,String formula,String value,int style) { return "<c r=\""+address+"\" s=\""+style+"\"><f>"+escape(formula)+"</f><v>"+value+"</v></c>"; }
+    private static String guideSheet() {
+        String[] notes={"차곡가계부 엑셀 사용 안내", "내역 시트의 첫 번째 행은 바꾸지 말고, 두 번째 행부터 입력하세요.",
+            "돈의 성격과 상세 분류는 별도 열이에요. 예: 수입 / 월급, 투자 / 주식.",
+            "D열 돈의 성격 셀을 선택한 뒤 드롭다운에서 수입·지출·저축·투자 중 하나를 고르세요.",
+            "날짜: YYYY-MM-DD 문자 또는 엑셀 날짜 셀. 분류와 메모는 생략할 수 있어요.",
+            "금액: 수입은 양수(+), 지출·저축·투자는 음수(−). 앱으로 복원하면 양수로 저장해요.",
+            "금액 절댓값은 1~999,999,999,999원의 정수예요.",
+            "새 내역의 고유ID는 비워 두세요. 백업 ID는 복원 시 중복·충돌을 확인하는 데 사용해요.",
+            "ID가 없으면 날짜·돈의 성격·금액·상세 분류·메모가 모두 같은 내역을 중복으로 보아요.",
+            "같은 ID로 내용을 바꾸면 충돌로 표시돼요. 기존 내역 수정은 앱에서 해 주세요.",
+            "수식은 값으로 붙여 넣은 뒤 저장해 주세요. .xlsx만 지원해요.",
+            "가져오기는 최대 10,000건. 오류가 있으면 전체를 추가하지 않으며 기존 내역은 지우지 않아요.",
+            "사용 가능 금액 = 수입 − 지출 − 저축 − 투자. 저축과 투자는 지출 합계와 구분돼요.",
+            "계좌는 앱에 정보가 없어 빈칸이에요. 이체 행은 앱으로 가져올 수 없어요.",
+            "구분·분류·메모 열의 예전 양식도 가져올 수 있어요. 예전 양식의 금액은 모두 양수예요.",
+            "투자 금액은 매수·납입 등 나간 금액을 기록해요.",
+            "기존 기록의 돈의 성격은 그대로 유지해요. 저축으로 저장한 주식도 자동으로 투자로 바꾸지 않아요.",
+            "앱 삭제 시 휴대폰 내 기록도 삭제돼요. 백업 파일은 휴대폰 밖에도 보관해 주세요."};
+        StringBuilder sheet=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><cols><col min=\"1\" max=\"1\" width=\"120\" customWidth=\"1\"/></cols><sheetData>");
+        for(int i=0;i<notes.length;i++) sheet.append("<row r=\"").append(i+1).append("\" ht=\"28\" customHeight=\"1\">").append(textCell("A"+(i+1),notes[i],i==0?1:0)).append("</row>");
+        return sheet.append("</sheetData></worksheet>").toString();
     }
     private static void put(ZipOutputStream zip,String path,String text) throws IOException {
         zip.putNextEntry(new ZipEntry(path)); zip.write(text.getBytes(StandardCharsets.UTF_8)); zip.closeEntry();
@@ -146,7 +200,7 @@ public final class XlsxIO {
     private static final class SheetHandler extends DefaultHandler {
         final List<String> strings; final boolean date1904; final ReadResult result;
         final Map<Integer,Cell> cells=new HashMap<>(); final Map<String,Integer> headers=new HashMap<>();
-        int row, column, rows; boolean inValue,inText,hasHeader; Cell cell; StringBuilder value;
+        int row, column, rows; boolean inValue,inText,hasHeader,signedAmounts; Cell cell; StringBuilder value;
         SheetHandler(List<String> strings,boolean date1904,ReadResult result) { this.strings=strings; this.date1904=date1904; this.result=result; }
         public void startElement(String uri,String local,String q,Attributes a) throws SAXException {
             if(local.equals("row")) { cells.clear(); String r=a.getValue("r"); row=r==null?row+1:Integer.parseInt(r); column=-1; }
@@ -176,10 +230,12 @@ public final class XlsxIO {
             if(blank) return;
             if(!hasHeader) {
                 for(Map.Entry<Integer,Cell> item:cells.entrySet()) {
-                    String label=header(item.getValue().value);
+                    String raw=cleanHeader(item.getValue().value);
+                    if(raw.equals("거래유형") || raw.equals("돈의성격")) signedAmounts=true;
+                    String label=header(raw);
                     if(label!=null) { if(headers.put(label,item.getKey())!=null) throw new SAXException("중복된 열 제목이 있어요: "+label); }
                 }
-                if(!headers.containsKey("날짜") || !headers.containsKey("구분") || !headers.containsKey("금액")) throw new SAXException("첫 행에 날짜, 구분, 금액 열이 필요해요. 앱의 입력 양식을 사용해 주세요.");
+                if(!headers.containsKey("날짜") || !headers.containsKey("구분") || !headers.containsKey("금액")) throw new SAXException("첫 행에 날짜, 돈의 성격(또는 구분), 금액 열이 필요해요. 앱의 입력 양식을 사용해 주세요.");
                 hasHeader=true; return;
             }
             if(++rows>Ledger.MAX_IMPORT_ROWS) throw new SAXException("최대 10,000건씩 나누어 가져와 주세요.");
@@ -191,7 +247,11 @@ public final class XlsxIO {
                     LocalDate converted=date1904?LocalDate.of(1904,1,1).plusDays(serial):LocalDate.of(1899,12,31).plusDays(serial>60?serial-1:serial);
                     date=converted.toString();
                 }
-                result.entries.add(new Ledger.Entry(get("고유ID"),date,get("구분"),Ledger.parseAmount(get("금액")),get("분류"),get("메모"),row));
+                String type=get("구분");
+                if("이체".equals(type.trim())) throw new IllegalArgumentException("이체는 앱에 저장할 수 없어요. 해당 행을 제외해 주세요.");
+                type=Ledger.normalizeType(type);
+                long amount=signedAmounts?parseSignedAmount(get("금액"),type):Ledger.parseAmount(get("금액"));
+                result.entries.add(new Ledger.Entry(get("고유ID"),date,type,amount,get("분류"),get("메모"),row));
             } catch(Exception e) {
                 result.invalidRows++;
                 if(result.errors.size()<50) result.errors.add(row+"행: "+(e.getMessage()==null?"셀 값을 확인하세요.":e.getMessage()));
@@ -204,13 +264,24 @@ public final class XlsxIO {
             if("e".equals(found.type)) throw new IllegalArgumentException(name+"에 엑셀 오류 값이 있어요.");
             return found.value;
         }
+        private static long parseSignedAmount(String value,String type) {
+            String raw=value.trim().replace(",","");
+            if(raw.endsWith("원")) raw=raw.substring(0,raw.length()-1).trim();
+            BigDecimal signed;
+            try { signed=new BigDecimal(raw); } catch(NumberFormatException ex) { throw new IllegalArgumentException("금액은 정수로 입력하세요."); }
+            boolean income=TransactionType.INCOME.equals(type);
+            if((income && signed.signum()<=0) || (!income && signed.signum()>=0))
+                throw new IllegalArgumentException("수입은 양수(+), 지출·저축·투자는 음수(−)로 입력하세요.");
+            return Ledger.parseAmount(signed.abs().toString());
+        }
+        private static String cleanHeader(String text) { return text.trim().replace(" ","").replace("\uFEFF","").toLowerCase(Locale.ROOT); }
         private static String header(String text) {
-            String s=text.trim().replace(" ","").replace("\uFEFF","").toLowerCase(Locale.ROOT);
+            String s=cleanHeader(text);
             if(s.equals("날짜") || s.equals("date")) return "날짜";
-            if(s.equals("구분") || s.equals("유형") || s.equals("type")) return "구분";
+            if(s.equals("구분") || s.equals("유형") || s.equals("type") || s.equals("거래유형") || s.equals("돈의성격")) return "구분";
             if(s.equals("금액") || s.equals("amount")) return "금액";
-            if(s.equals("분류") || s.equals("카테고리") || s.equals("category")) return "분류";
-            if(s.equals("메모") || s.equals("내용") || s.equals("memo")) return "메모";
+            if(s.equals("분류") || s.equals("카테고리") || s.equals("category") || s.equals("상세분류")) return "분류";
+            if(s.equals("메모") || s.equals("내용") || s.equals("memo") || s.equals("내역")) return "메모";
             if(s.equals("고유id") || s.equals("id")) return "고유ID";
             return null;
         }
