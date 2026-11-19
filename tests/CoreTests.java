@@ -100,11 +100,15 @@ public final class CoreTests {
         eq(true,summary.contains("SUMIFS('내역'!$D$2:$D$5,'내역'!$E$2:$E$5"));
         eq("3000000",cached(summary,"B3"));eq("500000",cached(summary,"B4"));eq("700000",cached(summary,"B5"));eq("400000",cached(summary,"B6"));eq("1400000",cached(summary,"B7"));eq(true,summary.contains("B3-B4-B5-B6"));eq(true,summary.contains("IF(B3&gt;0,B5/B3,0)"));eq(true,summary.contains("2026-10-01 ~ 2026-10-04"));
         eq(true,Math.abs(700000.0/3000000-Double.parseDouble(cached(summary,"B8")))<1e-15);
+        eq(true,Math.abs(400000.0/3000000-Double.parseDouble(cached(summary,"B9")))<1e-15);eq("1100000",cached(summary,"B10"));eq(true,summary.contains("B5+B6"));
+        eq(true,Math.abs(1100000.0/3000000-Double.parseDouble(cached(summary,"B11")))<1e-15);eq(true,Math.abs(500000.0/3000000-Double.parseDouble(cached(summary,"B12")))<1e-15);eq(true,Math.abs(1400000.0/3000000-Double.parseDouble(cached(summary,"B13")))<1e-15);
+        {double total=0;for(String c:new String[]{"B12","B8","B9","B13"})total+=Double.parseDouble(cached(summary,c));eq(true,Math.abs(1-total)<1e-12);}
+        eq(true,summary.contains("모은 비율 (저축+투자)"));eq(true,summary.contains("투자률"));
         XlsxIO.ReadResult read=read(bytes);eq(0,read.invalidRows);eq(4,read.entries.size());for(int i=0;i<4;i++){eq(entries.get(i).id,read.entries.get(i).id);eq(entries.get(i).fingerprint(),read.entries.get(i).fingerprint());}
         eq(4,Ledger.planImport(read.entries,entries).duplicates);eq(0,Ledger.planImport(read.entries,entries).additions.size());
         List<Ledger.Entry> noIds=new ArrayList<>();for(Ledger.Entry e:read.entries)noIds.add(e.withId(""));eq(4,Ledger.planImport(noIds,entries).duplicates);
         eq(1,Ledger.planImport(Collections.singletonList(new Ledger.Entry("investment","2026-10-04","저축",400000,"ETF","정기 매수",0)),entries).errors.size());
-        parts=unzip(export(Collections.emptyList(),false));summary=parts.get("xl/worksheets/sheet1.xml");eq(true,summary.contains("기록 없음"));for(int r=3;r<=8;r++)eq("0",cached(summary,"B"+r));eq(0,read(export(Collections.emptyList(),false)).entries.size());
+        parts=unzip(export(Collections.emptyList(),false));summary=parts.get("xl/worksheets/sheet1.xml");eq(true,summary.contains("기록 없음"));for(int r=3;r<=13;r++)eq("0",cached(summary,"B"+r));eq(0,read(export(Collections.emptyList(),false)).entries.size());
         parts=unzip(export(Collections.emptyList(),true));eq(false,parts.get("xl/workbook.xml").contains("name=\"요약\""));eq(true,parts.get("xl/worksheets/sheet1.xml").contains("수입,지출,저축,투자"));eq(true,parts.get("xl/worksheets/sheet1.xml").contains("돈의 성격"));
         eq(true,parts.get("xl/worksheets/sheet1.xml").contains("sqref=\"E2:E10001\""));
         eq(true,parts.get("xl/worksheets/sheet1.xml").contains("A1:F1"));

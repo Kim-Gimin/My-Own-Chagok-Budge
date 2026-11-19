@@ -29,7 +29,7 @@ final class OverviewData {
         if(from!=null && to!=null && from.isAfter(to))throw new IllegalArgumentException("시작 월은 끝 월보다 늦을 수 없어요.");
         TreeMap<YearMonth,long[]> groups=new TreeMap<>(Collections.reverseOrder());long[] total=new long[Ledger.TYPES.length];
         for(Ledger.Entry e:entries){YearMonth m=YearMonth.from(LocalDate.parse(e.date));if((from!=null && m.isBefore(from)) || (to!=null && m.isAfter(to)))continue;
-            long[] values=groups.get(m);if(values==null){values=new long[Ledger.TYPES.length];groups.put(m,values);}int i=Ledger.index(e.type);values[i]=Math.addExact(values[i],e.amount);total[i]=Math.addExact(total[i],e.amount);
+            long[] values=groups.get(m);if(values==null){values=new long[Ledger.TYPES.length];groups.put(m,values);}int i=Ledger.index(e.type);values[i]=Math.addExact(values[i],e.effect());total[i]=Math.addExact(total[i],e.effect());
         }
         List<MonthTotal> months=new ArrayList<>();for(Map.Entry<YearMonth,long[]> item:groups.entrySet())months.add(new MonthTotal(item.getKey(),item.getValue()));
         return new Settlement(months,total);
@@ -38,7 +38,7 @@ final class OverviewData {
         long[][] totals=new long[5][Ledger.TYPES.length];LocalDate monday=today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));LocalDate sunday=monday.plusDays(6);
         for(Ledger.Entry e:entries){LocalDate date=LocalDate.parse(e.date);int type=Ledger.index(e.type);
             boolean[] include={date.equals(today),!date.isBefore(monday)&&!date.isAfter(sunday),YearMonth.from(date).equals(YearMonth.from(today)),date.getYear()==today.getYear(),true};
-            for(int p=0;p<5;p++)if(include[p])totals[p][type]=Math.addExact(totals[p][type],e.amount);
+            for(int p=0;p<5;p++)if(include[p])totals[p][type]=Math.addExact(totals[p][type],e.effect());
         }
         List<Metric> result=new ArrayList<>();for(int p=0;p<5;p++)for(int t=0;t<AMOUNT_NAMES.length;t++)result.add(new Metric(PERIOD_IDS[p]+"_"+t,PERIOD_NAMES[p]+" "+AMOUNT_NAMES[t],t==3?Ledger.available(totals[p]):totals[p][t==4?3:t]));return result;
     }

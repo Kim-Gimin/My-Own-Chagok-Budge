@@ -68,7 +68,7 @@ final class PlanningData {
     static List<MonthTotal> trend(List<Ledger.Entry> entries,YearMonth end,int count){
         if(count!=6&&count!=12)throw new IllegalArgumentException("6개월 또는 12개월을 선택하세요.");
         List<MonthTotal> result=new ArrayList<>();YearMonth from=end.minusMonths(count-1);if(from.getYear()<1900)from=YearMonth.of(1900,1);
-        Map<String,long[]> map=new HashMap<>();for(Ledger.Entry e:entries){YearMonth m=YearMonth.from(LocalDate.parse(e.date));if(!m.isBefore(from)&&!m.isAfter(end)){long[] totals=map.computeIfAbsent(m.toString(),k->new long[4]);int kind=Ledger.index(e.type);totals[kind]=Math.addExact(totals[kind],e.amount);}}
+        Map<String,long[]> map=new HashMap<>();for(Ledger.Entry e:entries){YearMonth m=YearMonth.from(LocalDate.parse(e.date));if(!m.isBefore(from)&&!m.isAfter(end)){long[] totals=map.computeIfAbsent(m.toString(),k->new long[4]);int kind=Ledger.index(e.type);totals[kind]=Math.addExact(totals[kind],e.effect());}}
         for(YearMonth m=from;!m.isAfter(end);m=m.plusMonths(1))result.add(new MonthTotal(m,map.getOrDefault(m.toString(),new long[4])));return result;
     }
     static final class Change {
@@ -76,10 +76,10 @@ final class PlanningData {
         Change(long current,long previous){this.current=current;this.previous=previous;difference=Math.subtractExact(current,previous);percent=previous==0?null:difference*100.0/previous;}
     }
     static Change change(List<Ledger.Entry> entries,YearMonth month,String type,String category){
-        long current=0,previous=0;String before=month.minusMonths(1).toString();for(Ledger.Entry e:entries)if(e.type.equals(type)&&(category==null||category.equals(e.category))){if(e.date.startsWith(month.toString()))current=Math.addExact(current,e.amount);else if(e.date.startsWith(before))previous=Math.addExact(previous,e.amount);}return new Change(current,previous);
+        long current=0,previous=0;String before=month.minusMonths(1).toString();for(Ledger.Entry e:entries)if(Ledger.matches(e,type)&&(category==null||category.equals(e.category))){if(e.date.startsWith(month.toString()))current=Math.addExact(current,e.effect());else if(e.date.startsWith(before))previous=Math.addExact(previous,e.effect());}return new Change(current,previous);
     }
     static Map<String,Change> categoryChanges(List<Ledger.Entry> entries,YearMonth month,String type){
-        Map<String,long[]> totals=new TreeMap<>();String current=month.toString(),previous=month.minusMonths(1).toString();for(Ledger.Entry e:entries)if(e.type.equals(type)){int slot=e.date.startsWith(current)?0:e.date.startsWith(previous)?1:-1;if(slot>=0){long[] values=totals.computeIfAbsent(e.category,k->new long[2]);values[slot]=Math.addExact(values[slot],e.amount);}}
+        Map<String,long[]> totals=new TreeMap<>();String current=month.toString(),previous=month.minusMonths(1).toString();for(Ledger.Entry e:entries)if(Ledger.matches(e,type)){int slot=e.date.startsWith(current)?0:e.date.startsWith(previous)?1:-1;if(slot>=0){long[] values=totals.computeIfAbsent(e.category,k->new long[2]);values[slot]=Math.addExact(values[slot],e.effect());}}
         Map<String,Change> result=new TreeMap<>();for(Map.Entry<String,long[]> item:totals.entrySet())result.put(item.getKey(),new Change(item.getValue()[0],item.getValue()[1]));return result;
     }
     /** Existing keys win, including the advanced cursor of a recurring transaction. */

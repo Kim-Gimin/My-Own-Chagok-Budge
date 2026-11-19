@@ -54,7 +54,7 @@ final class DonutChartView extends View {
         switch(event.getActionMasked()){
             case MotionEvent.ACTION_DOWN:
                 if(fling!=null)fling.cancel();float distance=(float)Math.hypot(x-getWidth()/2f,y-getHeight()/2f),r=radius();
-                if(data.total==0||distance<r*.57f||distance>r+dp(6))return false;
+                if(data.chartTotal()==0||distance<r*.57f||distance>r+dp(6))return false;
                 tracking=true;dragged=false;downX=x;downY=y;lastAngle=angle(x,y);lastTime=event.getEventTime();velocity=0;getParent().requestDisallowInterceptTouchEvent(true);return true;
             case MotionEvent.ACTION_MOVE:
                 if(!tracking)return false;float current=angle(x,y),difference=delta(current-lastAngle);long elapsed=event.getEventTime()-lastTime;
@@ -64,7 +64,7 @@ final class DonutChartView extends View {
             case MotionEvent.ACTION_UP:
                 if(!tracking)return false;tracking=false;getParent().requestDisallowInterceptTouchEvent(false);
                 if(dragged){if(event.getEventTime()-lastTime<120&&Math.abs(velocity)>15){float start=rotation,travel=Math.max(-540,Math.min(540,velocity*.22f));fling=ValueAnimator.ofFloat(start,start+travel);fling.setDuration(700);fling.setInterpolator(new DecelerateInterpolator());fling.addUpdateListener(a->rotate((float)a.getAnimatedValue()));fling.start();}}
-                else{performClick();float hit=normalized(angle(x,y)-rotation),start=0;for(int i=0;i<data.chartCategories.size();i++){float sweep=(float)(data.chartCategories.get(i).amount*360.0/data.total);if(hit>=start&&hit<start+sweep){listener.selected(i);break;}start+=sweep;}}
+                else{performClick();float hit=normalized(angle(x,y)-rotation),start=0;for(int i=0;i<data.chartCategories.size();i++){float sweep=(float)(data.chartCategories.get(i).amount*360.0/data.chartTotal());if(hit>=start&&hit<start+sweep){listener.selected(i);break;}start+=sweep;}}
                 return true;
             case MotionEvent.ACTION_CANCEL:tracking=false;getParent().requestDisallowInterceptTouchEvent(false);return true;
         }return tracking;
@@ -78,7 +78,7 @@ final class DonutChartView extends View {
         super.onDraw(canvas);float w=getWidth(),h=getHeight(),cx=w/2,cy=h/2;
         float radius=Math.min(w*.39f,h*.46f),inner=radius*.57f;
         paint.setStyle(Paint.Style.FILL);
-        if(data.total==0){
+        if(data.chartTotal()==0){
             paint.setColor(emptyColor);canvas.drawCircle(cx,cy,radius,paint);paint.setColor(surface);canvas.drawCircle(cx,cy,inner,paint);
             textPaint.setColor(muted);textPaint.setTextSize(14*fontScale);textPaint.setTextAlign(Paint.Align.CENTER);textPaint.setTypeface(font);
             Paint.FontMetrics fm=textPaint.getFontMetrics();canvas.drawText("기록 없음",cx,cy-(fm.ascent+fm.descent)/2,textPaint);return;
@@ -87,7 +87,7 @@ final class DonutChartView extends View {
         List<Callout> left=new ArrayList<>(),right=new ArrayList<>();List<Float> boundaries=new ArrayList<>();
         for(int i=0;i<data.chartCategories.size();i++){
             StatisticsData.Category category=data.chartCategories.get(i);
-            float sweep=(float)(category.amount*360.0/data.total);float middle=start+sweep/2;
+            float sweep=(float)(category.amount*360.0/data.chartTotal());float middle=start+sweep/2;
             paint.setColor(chartColor(i));canvas.drawArc(bounds,start,sweep,true,paint);boundaries.add(start);
             if(sweep>=18){
                 double a=Math.toRadians(middle);float middleRadius=(radius+inner)/2;

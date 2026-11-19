@@ -21,14 +21,14 @@ final class HistoryData {
     }
     static Result build(List<Ledger.Entry> all,YearMonth month,String type,String memo,Set<String> categories,int sort){
         String query=memo.trim().toLowerCase(Locale.KOREA);List<Ledger.Entry> entries=new ArrayList<>();
-        for(Ledger.Entry entry:all)if((month==null||entry.date.startsWith(month.toString()+"-"))&&(type.isEmpty()||entry.type.equals(type))&&(categories.isEmpty()||categories.contains(entry.category))&&(query.isEmpty()||entry.memo.toLowerCase(Locale.KOREA).contains(query)))entries.add(entry);
+        for(Ledger.Entry entry:all)if((month==null||entry.date.startsWith(month.toString()+"-"))&&(type.isEmpty()||Ledger.matches(entry,type))&&(categories.isEmpty()||categories.contains(entry.category))&&(query.isEmpty()||entry.memo.toLowerCase(Locale.KOREA).contains(query)))entries.add(entry);
         Collator collator=Collator.getInstance(Locale.KOREA);
         entries.sort((a,b)->{if(sort==CATEGORY){int c=collator.compare(a.category,b.category);if(c==0)c=a.category.compareTo(b.category);if(c!=0)return c;}return b.date.compareTo(a.date);});
         List<Month> groups=new ArrayList<>();long[] total=new long[Ledger.TYPES.length];Month current=null;Day day=null;
         for(Ledger.Entry entry:entries){YearMonth yearMonth=YearMonth.from(LocalDate.parse(entry.date));String category=sort==CATEGORY?entry.category:"";
             if(current==null||!current.month.equals(yearMonth)||!current.category.equals(category)){current=new Month(yearMonth,category);groups.add(current);day=null;}
             if(day==null||!day.date.equals(entry.date)){day=new Day(entry.date);current.days.add(day);}
-            day.entries.add(entry);current.count++;int i=Ledger.index(entry.type);day.totals[i]=Math.addExact(day.totals[i],entry.amount);current.totals[i]=Math.addExact(current.totals[i],entry.amount);total[i]=Math.addExact(total[i],entry.amount);
+            day.entries.add(entry);current.count++;int i=Ledger.index(entry.type);day.totals[i]=Math.addExact(day.totals[i],entry.effect());current.totals[i]=Math.addExact(current.totals[i],entry.effect());total[i]=Math.addExact(total[i],entry.effect());
         }
         return new Result(entries,groups,total);
     }

@@ -29,6 +29,7 @@ public final class Ledger {
             if (this.id.length() > 128 || this.id.matches(".*[\\p{Cntrl}].*")) throw new IllegalArgumentException("고유ID 형식을 확인하세요.");
             this.sourceRow = row;
         }
+        public long effect(){return type.equals("저축회수")?-amount:amount;}
         public Entry withId(String newId) { return new Entry(newId, date, type, amount, category, memo, sourceRow); }
         public String fingerprint() { return date + ":" + type + ":" + amount + ":" + category.length() + ":" + category + memo.length() + ":" + memo; }
         public boolean sameContent(Entry other) { return fingerprint().equals(other.fingerprint()); }
@@ -48,6 +49,7 @@ public final class Ledger {
         String s = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
         if (s.equals("수입") || s.equals("income")) return "수입";
         if (s.equals("지출") || s.equals("expense")) return "지출";
+        if(s.equals("저축회수"))return "저축회수";
         if (s.equals("저축") || s.equals("saving") || s.equals("savings")) return "저축";
         if (s.equals("투자") || s.equals("investment") || s.equals("investing")) return "투자";
         throw new IllegalArgumentException("돈의 성격은 수입, 지출, 저축, 투자 중 하나로 입력하세요.");
@@ -63,10 +65,12 @@ public final class Ledger {
     }
     public static long[] totals(List<Entry> entries) {
         long[] result = new long[TYPES.length];
-        for (Entry e : entries) result[index(e.type)] = Math.addExact(result[index(e.type)], e.amount);
+        for (Entry e : entries) result[index(e.type)] = Math.addExact(result[index(e.type)], e.effect());
         return result;
     }
+    public static boolean matches(Entry e,String kind){return e.type.equals(kind)||(kind.equals("저축")&&e.type.equals("저축회수"));}
     public static int index(String type) {
+        if(type.equals("저축회수"))return 2;
         for (int i=0;i<TYPES.length;i++) if (TYPES[i].equals(type)) return i;
         throw new IllegalArgumentException("알 수 없는 돈의 성격이에요: "+type);
     }

@@ -27,7 +27,7 @@ public final class TransactionType {
         for(String word:keywords) if(!word.isEmpty() && text.contains(word.toLowerCase(Locale.ROOT))) return true;
         return false;
     }
-    public static String of(Ledger.Entry entry) { return classify(entry.type,entry.memo+" "+entry.category,INCOME.equals(entry.type)); }
-    public static long signedAmount(Ledger.Entry entry) { return INCOME.equals(of(entry))?entry.amount:-entry.amount; }
+    public static String of(Ledger.Entry entry) { if(entry.type.equals("저축회수"))return "저축회수";return classify(entry.type,entry.memo+" "+entry.category,INCOME.equals(entry.type)); }
+    public static long signedAmount(Ledger.Entry entry) { return INCOME.equals(of(entry))||entry.type.equals("저축회수")?entry.amount:-entry.amount; }
     private TransactionType() {}
 }
