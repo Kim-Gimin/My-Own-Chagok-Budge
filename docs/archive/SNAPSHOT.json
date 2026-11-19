@@ -1,0 +1,15 @@
+{
+  "version": "0.1.0",
+  "code": 1,
+  "variant": "",
+  "tag": "v0.1.0",
+  "source": "chagok-source.zip",
+  "source_sha256": "7f2ad88cc5be433ea1d516cf66ef65f37c39c66199a0b24151a462c055628426",
+  "files": 26,
+  "excluded": [
+    "local-test.keystore"
+  ],
+  "imported_on": "2026-11-19",
+  "history": "Public source snapshot with synthetic examples. Original private documentation/binaries omitted.",
+  "public_examples_sanitized": true
+}
