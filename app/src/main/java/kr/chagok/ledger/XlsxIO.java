@@ -17,7 +17,7 @@ public final class XlsxIO {
     private static final String NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     private static final String REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     private static final int MAX_XML = 32 * 1024 * 1024, MAX_TOTAL = 64 * 1024 * 1024;
-    private static final String[] BACKUP_HEADERS = {"날짜", "내역", "상세 분류", "금액", "돈의 성격", "고유ID"};
+    private static final String[] BACKUP_HEADERS = {"날짜", "내역", "상세 분류", "금액", "돈의 성격", "고유ID", "시간"};
     private static final String STYLES = "<?xml version=\"1.0\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><numFmts count=\"4\"><numFmt numFmtId=\"164\" formatCode=\"yyyy-mm-dd\"/><numFmt numFmtId=\"165\" formatCode=\"#,##0\"/><numFmt numFmtId=\"166\" formatCode=\"+#,##0;-#,##0;0\"/><numFmt numFmtId=\"167\" formatCode=\"0.0%\"/></numFmts><fonts count=\"3\"><font><sz val=\"11\"/><name val=\"맑은 고딕\"/></font><font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"맑은 고딕\"/></font><font><b/><sz val=\"11\"/><name val=\"맑은 고딕\"/></font></fonts><fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF19765B\"/><bgColor indexed=\"64\"/></patternFill></fill></fills><borders count=\"1\"><border/></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"7\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\"/><xf numFmtId=\"164\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"165\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"166\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"167\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/></cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles></styleSheet>";
     public static final class ReadResult {
         public final List<Ledger.Entry> entries = new ArrayList<>();
@@ -32,7 +32,7 @@ public final class XlsxIO {
     private static void writeInternal(OutputStream output,List<Ledger.Entry> input,boolean template,List<OpeningAsset> opening,boolean includeOpening,PlanningData planning)throws IOException {
         if(opening.size()>Ledger.MAX_IMPORT_ROWS)throw new IOException("기초자산은 최대10,000건까지 저장할 수 있어요.");
         List<Ledger.Entry> entries = new ArrayList<>(input);
-        entries.sort(Comparator.comparing((Ledger.Entry e) -> e.date).thenComparing(e -> e.id));
+        entries.sort(Comparator.comparing((Ledger.Entry e) -> e.date).thenComparing(e -> e.time).thenComparing(e -> e.id));
         if(entries.size()>Ledger.MAX_IMPORT_ROWS) throw new IOException("한 파일에 최대 10,000건을 저장할 수 있어요. 기간을 나누어 백업해 주세요.");
         String[] names=template?new String[]{"내역","사용 안내","입력예시"}:new String[]{"요약","내역","사용 안내"};
         if(includeOpening){names=Arrays.copyOf(names,4);names[3]="기초자산";}
@@ -63,7 +63,7 @@ public final class XlsxIO {
     }
     private static String detailSheet(List<Ledger.Entry> entries,boolean template) {
         String[] headers=BACKUP_HEADERS;
-        int[] widths={16,52,24,22,18,40};
+        int[] widths={16,52,24,22,18,40,16};
         StringBuilder sheet=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews><cols>");
         for(int c=0;c<widths.length;c++) sheet.append("<col min=\"").append(c+1).append("\" max=\"").append(c+1).append("\" width=\"").append(widths[c]).append("\" customWidth=\"1\"/>");
         sheet.append("</cols><sheetData><row r=\"1\" ht=\"28\" customHeight=\"1\">");
@@ -72,7 +72,7 @@ public final class XlsxIO {
         for(Ledger.Entry entry:entries) {
             sheet.append("<row r=\"").append(r).append("\">").append(numberCell("A"+r,Long.toString(excelSerial(LocalDate.parse(entry.date))),2));
             sheet.append(textCell("B"+r,entry.memo,0)).append(textCell("C"+r,entry.category,0)).append(numberCell("D"+r,Long.toString(template?entry.amount:TransactionType.signedAmount(entry)),template?3:4));
-            sheet.append(textCell("E"+r,TransactionType.of(entry),0)).append(textCell("F"+r,entry.id,0));
+            sheet.append(textCell("E"+r,TransactionType.of(entry),0)).append(textCell("F"+r,entry.id,0)).append(textCell("G"+r,entry.time,0));
             sheet.append("</row>");r++;
         }
         sheet.append("</sheetData><autoFilter ref=\"A1:").append(col(headers.length-1)).append(Math.max(1,r-1)).append("\"/>");
@@ -107,7 +107,7 @@ public final class XlsxIO {
     private static String formulaCell(String address,String formula,String value,int style) { return "<c r=\""+address+"\" s=\""+style+"\"><f>"+escape(formula)+"</f><v>"+value+"</v></c>"; }
     private static String exampleSheet() {
         StringBuilder sheet=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><sheetViews><sheetView workbookViewId=\"0\" tabSelected=\"1\" showGridLines=\"0\"/></sheetViews><cols>");
-        int[] widths={16,44,26,22,18,24};
+        int[] widths={16,44,26,22,18,24,16};
         for(int c=0;c<widths.length;c++)sheet.append("<col min=\"").append(c+1).append("\" max=\"").append(c+1).append("\" width=\"").append(widths[c]).append("\" customWidth=\"1\"/>");
         sheet.append("</cols><sheetData><row r=\"1\" ht=\"30\" customHeight=\"1\">").append(textCell("A1","돈의 성격과 입력 예시",6)).append("</row><row r=\"2\" ht=\"28\" customHeight=\"1\">").append(textCell("A2","금액은 모두 양수로 입력하세요. 앱이 돈의 성격에 따라 수입·저축회수는 더하고 지출·저축·투자는 차감해요.",0)).append("</row><row r=\"3\" ht=\"28\" customHeight=\"1\">").append(textCell("A3","참고용 예시는 앱에 추가하지 않아요. 실제 기록은 ‘내역’ 시트의 2행부터 입력하세요.",0)).append("</row>");
         String[] headings={"돈의 성격","뜻","상세 분류 예","앱 반영"};
@@ -116,20 +116,20 @@ public final class XlsxIO {
         for(int i=0;i<meanings.length;i++){int r=i+5;sheet.append("<row r=\"").append(r).append("\" ht=\"26\" customHeight=\"1\">");for(int c=0;c<4;c++)sheet.append(textCell(col(c)+r,meanings[i][c],0));sheet.append("</row>");}
         sheet.append("<row r=\"10\" ht=\"28\" customHeight=\"1\">").append(textCell("A10","입력 예시 9건 (참고용)",6)).append("</row><row r=\"11\" ht=\"28\" customHeight=\"1\">");for(int c=0;c<BACKUP_HEADERS.length;c++)sheet.append(textCell(col(c)+"11",BACKUP_HEADERS[c],1));sheet.append("</row>");
         String[][] samples={{"2026-11-01","11월 급여","월급","수입","3000000"},{"2026-11-02","예금 이자","이자","수입","5000"},{"2026-11-03","점심 식사","식비","지출","12500"},{"2026-11-04","버스 요금","교통","지출","1500"},{"2026-11-05","정기 적금 납입","적금","저축","700000"},{"2026-11-06","주택 청약 납입","청약","저축","100000"},{"2026-11-07","ETF 정기 매수","ETF","투자","400000"},{"2026-11-08","주식 매수","주식","투자","100000"},{"2026-11-09","기록한 적금 원금 회수","적금","저축회수","700000"}};
-        for(int i=0;i<samples.length;i++){String[] sample=samples[i];int r=i+12;Ledger.Entry entry=new Ledger.Entry("",sample[0],sample[3],Long.parseLong(sample[4]),sample[2],sample[1],0);sheet.append("<row r=\"").append(r).append("\" ht=\"25\" customHeight=\"1\">").append(numberCell("A"+r,Long.toString(excelSerial(LocalDate.parse(entry.date))),2)).append(textCell("B"+r,entry.memo,0)).append(textCell("C"+r,entry.category,0)).append(numberCell("D"+r,Long.toString(entry.amount),3)).append(textCell("E"+r,entry.type,0)).append(textCell("F"+r,"",0)).append("</row>");}
-        sheet.append("<row r=\"21\" ht=\"28\" customHeight=\"1\">").append(textCell("A21","새 내역의 고유ID는 비워 두세요. 저축·투자는 지출 합계와 별도로 집계해요.",0)).append("</row>");
+        for(int i=0;i<samples.length;i++){String[] sample=samples[i];int r=i+12;Ledger.Entry entry=new Ledger.Entry("",sample[0],sample[3],Long.parseLong(sample[4]),sample[2],sample[1],0);sheet.append("<row r=\"").append(r).append("\" ht=\"25\" customHeight=\"1\">").append(numberCell("A"+r,Long.toString(excelSerial(LocalDate.parse(entry.date))),2)).append(textCell("B"+r,entry.memo,0)).append(textCell("C"+r,entry.category,0)).append(numberCell("D"+r,Long.toString(entry.amount),3)).append(textCell("E"+r,entry.type,0)).append(textCell("F"+r,"",0)).append(textCell("G"+r,String.format(Locale.ROOT,"%02d:%02d:%02d",9+i,i%2==0?0:30,i),0)).append("</row>");}
+        sheet.append("<row r=\"21\" ht=\"28\" customHeight=\"1\">").append(textCell("A21","새 내역의 고유ID는 비워 두세요. 시간(G열)은 HH:mm:ss로 입력하고 비우면 00:00:00이에요. 저축·투자는 지출 합계와 별도로 집계해요.",0)).append("</row>");
         sheet.append("<row r=\"24\" ht=\"28\" customHeight=\"1\">").append(textCell("A24","기초자산과 해지·재가입 예시 (아래 5건도 참고용)",6)).append("</row>");
         sheet.append("<row r=\"25\" ht=\"28\" customHeight=\"1\">").append(textCell("A25","기초자산 시트: 2026-01-01 / 예시적금 / 6,500,000 / 저축. 내역에는 올해 납입 합계3,500,000원이 이미 있는 사례예요.",0)).append("</row>");
         sheet.append("<row r=\"26\" ht=\"28\" customHeight=\"1\">");for(int c=0;c<BACKUP_HEADERS.length;c++)sheet.append(textCell(col(c)+"26",BACKUP_HEADERS[c],1));sheet.append("</row>");
         String[][] allocation={{"해지 이자","이자","120000","수입"},{"정부기여금","정부기여금","80000","수입"},{"원금 전액 회수","예시적금","10000000","저축회수"},{"실제 예금 재가입","예금","8000000","저축"},{"주식 투자","주식","1500000","투자"}};
-        for(int i=0;i<allocation.length;i++){String[] a=allocation[i];int r=i+27;sheet.append("<row r=\"").append(r).append("\" ht=\"25\" customHeight=\"1\">").append(textCell("A"+r,"2026-07-15",0)).append(textCell("B"+r,a[0],0)).append(textCell("C"+r,a[1],0)).append(numberCell("D"+r,a[2],3)).append(textCell("E"+r,a[3],0)).append("</row>");}
+        for(int i=0;i<allocation.length;i++){String[] a=allocation[i];int r=i+27;sheet.append("<row r=\"").append(r).append("\" ht=\"25\" customHeight=\"1\">").append(textCell("A"+r,"2026-07-15",0)).append(textCell("B"+r,a[0],0)).append(textCell("C"+r,a[1],0)).append(numberCell("D"+r,a[2],3)).append(textCell("E"+r,a[3],0)).append(textCell("G"+r,"14:05:30",0)).append("</row>");}
         sheet.append("<row r=\"33\" ht=\"28\" customHeight=\"1\">").append(textCell("A33","올해 순저축 = 기존 납입3,500,000 − 원금회수10,000,000 + 재가입8,000,000 = 1,500,000원. 기초자산은 합계에 더하지 않아요.",0)).append("</row>");
-        return sheet.append("<row r=\"34\" ht=\"28\" customHeight=\"1\">").append(textCell("A34","실제 예금은22,000,000원으로 표시돼요. 이번 해지·배분 후 남는 돈은1,742,140원이며 별도 수입으로 다시 적지 마세요.",0)).append("</row></sheetData></worksheet>").toString();
+        return sheet.append("<row r=\"34\" ht=\"28\" customHeight=\"1\">").append(textCell("A34","실제 예금은22,000,000원으로 표시돼요. 이번 해지·배분 후 남는 돈은700,000원이며 별도 수입으로 다시 적지 마세요.",0)).append("</row></sheetData></worksheet>").toString();
     }
     private static String openingSheet(List<OpeningAsset> input){
         List<OpeningAsset> opening=new ArrayList<>(input);opening.sort(Comparator.comparing((OpeningAsset a)->a.date).thenComparing(a->a.id));
         StringBuilder s=new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?><worksheet xmlns=\""+NS+"\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" state=\"frozen\"/></sheetView></sheetViews><cols>");
-        int[] widths={16,52,24,22,18,40};for(int i=0;i<6;i++)s.append("<col min=\"").append(i+1).append("\" max=\"").append(i+1).append("\" width=\"").append(widths[i]).append("\" customWidth=\"1\"/>");s.append("</cols><sheetData><row r=\"1\">");
+        int[] widths={16,52,24,22,18,40,16};for(int i=0;i<6;i++)s.append("<col min=\"").append(i+1).append("\" max=\"").append(i+1).append("\" width=\"").append(widths[i]).append("\" customWidth=\"1\"/>");s.append("</cols><sheetData><row r=\"1\">");
         String[] headers={"날짜","메모","상세 분류","금액","자산 종류","고유ID"};for(int i=0;i<6;i++)s.append(textCell(col(i)+"1",headers[i],1));s.append("</row>");
         int row=1;for(OpeningAsset a:opening){row++;s.append("<row r=\"").append(row).append("\">").append(textCell("A"+row,a.date,0)).append(textCell("B"+row,a.memo,0)).append(textCell("C"+row,a.category,0)).append(numberCell("D"+row,Long.toString(a.amount),3)).append(textCell("E"+row,a.kind,0)).append(textCell("F"+row,a.id,0)).append("</row>");}
         return s.append("</sheetData><dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"0\" showErrorMessage=\"1\" errorStyle=\"stop\" errorTitle=\"자산 종류\" error=\"현금, 저축, 투자 중 선택하세요.\" sqref=\"E2:E10001\"><formula1>&quot;현금,저축,투자&quot;</formula1></dataValidation></dataValidations></worksheet>").toString();
@@ -149,7 +149,8 @@ public final class XlsxIO {
             "예전 지출·저축·투자의 음수 금액도 읽어요. 백업 파일은 유형별 부호를 자동 표시해요.",
             "금액 절댓값은 1~999,999,999,999원의 정수예요.",
             "새 내역의 고유ID는 비워 두세요. 백업 ID는 복원 시 중복·충돌을 확인하는 데 사용해요.",
-            "ID가 없으면 날짜·돈의 성격·금액·상세 분류·메모가 모두 같은 내역을 중복으로 보아요.",
+            "시간(G열): HH:mm:ss 문자 또는 엑셀 시간 값. 비우면 00:00:00이며 시간 포함 복원은 0.8.12 이상을 사용하세요.",
+            "ID가 없으면 날짜·시간·돈의 성격·금액·상세 분류·메모가 모두 같은 내역을 중복으로 보아요.",
             "같은 ID로 내용을 바꾸면 충돌로 표시돼요. 기존 내역 수정은 앱에서 해 주세요.",
             "수식은 값으로 붙여 넣은 뒤 저장해 주세요. .xlsx만 지원해요.",
             "가져오기는 최대 10,000건. 오류가 있으면 전체를 추가하지 않으며 기존 내역은 지우지 않아요.",
@@ -306,19 +307,21 @@ public final class XlsxIO {
             }
             if(++rows>Ledger.MAX_IMPORT_ROWS) throw new SAXException("최대 10,000건씩 나누어 가져와 주세요.");
             try {
-                String date=get("날짜");
+                String date=get("날짜").trim(),inferredTime="";
                 if(date.matches("[+-]?\\d+(\\.\\d+)?" ) && !date.matches("\\d{8}")) {
-                    long serial=new BigDecimal(date).setScale(0,java.math.RoundingMode.FLOOR).longValueExact();
+                    BigDecimal serialValue=new BigDecimal(date);long serial=serialValue.setScale(0,java.math.RoundingMode.FLOOR).longValueExact();if(!opening&&serialValue.subtract(BigDecimal.valueOf(serial)).signum()!=0)inferredTime=timeCell(serialValue.subtract(BigDecimal.valueOf(serial)).toPlainString());
                     if(serial<0 || (!date1904 && serial==60)) throw new IllegalArgumentException("올바르지 않은 엑셀 날짜예요.");
                     LocalDate converted=date1904?LocalDate.of(1904,1,1).plusDays(serial):LocalDate.of(1899,12,31).plusDays(serial>60?serial-1:serial);
                     date=converted.toString();
-                }
+                }else if(!opening){int at=date.indexOf('T');if(at<0)at=date.indexOf(' ');if(at>0){inferredTime=java.time.LocalTime.parse(date.substring(at+1),java.time.format.DateTimeFormatter.ISO_TIME).withNano(0).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));date=date.substring(0,at);}}
+
                 if(opening){result.openingAssets.add(new OpeningAsset(get("고유ID"),date,get("구분").trim(),Ledger.parseAmount(get("금액")),get("분류"),get("메모")));return;}
                 String type=get("구분");
                 if("이체".equals(type.trim())) throw new IllegalArgumentException("이체는 앱에 저장할 수 없어요. 해당 행을 제외해 주세요.");
                 type=Ledger.normalizeType(type);
                 long amount=signedAmounts?parseTypedAmount(get("금액"),type):Ledger.parseAmount(get("금액"));
-                result.entries.add(new Ledger.Entry(get("고유ID"),date,type,amount,get("분류"),get("메모"),row));
+                String clock=get("시간").trim();clock=clock.isEmpty()?(inferredTime.isEmpty()?"00:00:00":inferredTime):timeCell(clock);
+                result.entries.add(new Ledger.Entry(get("고유ID"),date,clock,type,amount,get("분류"),get("메모"),row));
             } catch(Exception e) {
                 result.invalidRows++;
                 if(result.errors.size()<50) result.errors.add((opening?"기초자산 시트 ":"")+row+"행: "+(e.getMessage()==null?"셀 값을 확인하세요.":e.getMessage()));
@@ -330,6 +333,11 @@ public final class XlsxIO {
             if(found.formula) throw new IllegalArgumentException(name+"의 수식은 값으로 붙여 넣어 주세요.");
             if("e".equals(found.type)) throw new IllegalArgumentException(name+"에 엑셀 오류 값이 있어요.");
             return found.value;
+        }
+        private static String timeCell(String raw){
+            if(raw.indexOf(':')>=0)return Ledger.normalizeTime(raw);
+            try{BigDecimal n=new BigDecimal(raw);if(n.signum()<0||n.compareTo(BigDecimal.ONE)>=0)throw new ArithmeticException();int seconds=n.multiply(BigDecimal.valueOf(86400)).setScale(0,java.math.RoundingMode.HALF_UP).intValueExact();if(seconds>=86400)throw new ArithmeticException();return java.time.LocalTime.ofSecondOfDay(seconds).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));}
+            catch(Exception ex){throw new IllegalArgumentException("시간은 HH:mm:ss 또는 올바른 엑셀 시간 값으로 입력하세요.");}
         }
         private static long parseTypedAmount(String value,String type) {
             String raw=value.trim().replace(",","");
@@ -344,7 +352,8 @@ public final class XlsxIO {
         private static String cleanHeader(String text) { return text.trim().replace(" ","").replace("\uFEFF","").toLowerCase(Locale.ROOT); }
         private static String header(String text) {
             String s=cleanHeader(text);
-            if(s.equals("날짜") || s.equals("date")) return "날짜";
+            if(s.equals("날짜") || s.equals("date") || s.equals("일시") || s.equals("datetime") || s.equals("날짜시간")) return "날짜";
+            if(s.equals("시간") || s.equals("시각") || s.equals("time"))return "시간";
             if(s.equals("구분") || s.equals("유형") || s.equals("type") || s.equals("거래유형") || s.equals("돈의성격")) return "구분";
             if(s.equals("금액") || s.equals("amount")) return "금액";
             if(s.equals("분류") || s.equals("카테고리") || s.equals("category") || s.equals("상세분류")) return "분류";

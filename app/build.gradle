@@ -6,8 +6,8 @@ android {
         applicationId 'kr.chagok.ledger'
         minSdk 26
         targetSdk 36
-        versionCode 25
-        versionName '0.8.11'
+        versionCode 26
+        versionName '0.8.12'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
     signingConfigs {

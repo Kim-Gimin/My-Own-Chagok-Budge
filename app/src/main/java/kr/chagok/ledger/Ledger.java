@@ -2,6 +2,7 @@ package kr.chagok.ledger;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
@@ -18,12 +19,16 @@ public final class Ledger {
     public static String cleanCategory(String value){if(value==null)return "";int start=0,end=value.length();while(start<end){int c=value.codePointAt(start);if(!categorySpace(c))break;start+=Character.charCount(c);}while(end>start){int c=value.codePointBefore(end);if(!categorySpace(c))break;end-=Character.charCount(c);}return value.substring(start,end);}
     private static boolean categorySpace(int c){return Character.isWhitespace(c)||Character.isSpaceChar(c)||c==0xFEFF||c==0x200B;}
     public static final class Entry {
-        public final String id, date, type, category, memo;
+        public final String id, date, time, type, category, memo;
         public final long amount;
         public final int sourceRow;
         public Entry(String id, String date, String type, long amount, String category, String memo, int row) {
+            this(id,date,"00:00:00",type,amount,category,memo,row);
+        }
+        public Entry(String id, String date, String time, String type, long amount, String category, String memo, int row) {
             this.id = id == null ? "" : id.trim();
             this.date = normalizeDate(date);
+            this.time = normalizeTime(time);
             this.type = normalizeType(type);
             if (amount < 1 || amount > MAX_AMOUNT) throw new IllegalArgumentException("금액은 1~999,999,999,999원의 정수로 입력하세요.");
             this.amount = amount;
@@ -35,10 +40,19 @@ public final class Ledger {
             this.sourceRow = row;
         }
         public long effect(){return type.equals("저축회수")?-amount:amount;}
-        public Entry withId(String newId) { return new Entry(newId, date, type, amount, category, memo, sourceRow); }
-        public String fingerprint() { return date + ":" + type + ":" + amount + ":" + category.length() + ":" + category + memo.length() + ":" + memo; }
+        public Entry withId(String newId) { return new Entry(newId, date, time, type, amount, category, memo, sourceRow); }
+        public String fingerprint() { return date + (time.equals("00:00:00")?"":"T"+time) + ":" + type + ":" + amount + ":" + category.length() + ":" + category + memo.length() + ":" + memo; }
         public boolean sameContent(Entry other) { return fingerprint().equals(other.fingerprint()); }
     }
+    public static String normalizeTime(String value) {
+        String text=value==null?"":value.trim();
+        if(text.isEmpty())return "00:00:00";
+        if(!text.matches("\\d{1,2}:\\d{2}(:\\d{2})?"))throw new IllegalArgumentException("시간은 HH:mm:ss 형식의 00:00:00~23:59:59로 입력하세요.");
+        try{String[] parts=text.split(":");return LocalTime.of(Integer.parseInt(parts[0]),Integer.parseInt(parts[1]),parts.length==3?Integer.parseInt(parts[2]):0).format(DateTimeFormatter.ofPattern("HH:mm:ss"));}
+        catch(Exception ex){throw new IllegalArgumentException("시간은 HH:mm:ss 형식의 00:00:00~23:59:59로 입력하세요.");}
+    }
+    private static final Comparator<Entry> NEWEST_FIRST=Comparator.comparing((Entry e)->e.date).thenComparing(e->e.time).reversed();
+    public static Comparator<Entry> newestFirst(){return NEWEST_FIRST;}
     public static String normalizeDate(String value) {
         String text = value == null ? "" : value.trim();
         LocalDate date;

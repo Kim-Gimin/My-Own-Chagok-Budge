@@ -1,12 +1,19 @@
-# 다른 AI/PC 개발 인계 — 2026-11-19
+# 다른 AI/PC 개발 인계 — 2026-11-20
 
-대상 저장소: https://github.com/Kim-Gimin/My-Own-Chagok-Budge. 최신 앱0.8.11/code25/DB4입니다. 루트가 Android Java 프로젝트입니다. 앱 코드 변경 없이 기존 배포 소스와 문서를 Git으로 이관했습니다.
+대상 저장소: https://github.com/Kim-Gimin/My-Own-Chagok-Budge. 최신 앱0.8.12/code26/DB5입니다. 루트가 Android Java 프로젝트입니다. 0.8.12에서 현재·지정 시각과 달력 → 시계 입력을 추가했습니다.
 
 1. `README.md`, `FEATURES.md`, `AGENTS.md`, `VALIDATION.md`, `docs/DATA_SAFETY.md`를 먼저 읽으세요.
 2. `main`에서 새 작업 브랜치를 만들고 요청받은 항목만 한 번에 하나씩 작업하세요. 기존 사용자의 DB/원금/설정과 백업 호환을 보존하세요.
 3. SDK36/JDK17을 준비하고 `docs/BUILD.md`의 JVM 검사와 변경에 맞는 Android 전용 에뮬레이터 검사를 실행하세요. 실제 폰에 test-android 초기화를 실행하지 마세요.
 4. 서명키는 저장소에 없습니다. 기존 앱을 업데이트하려면 소유자가 따로 보관한 원본 키가 필요합니다. 다른 키를 생성해 업데이트 APK라고 배포하지 마세요.
 5. 앱 기능 배포 시 버전/문서/검증/새 빈 양식·APK 해시를 함께 정리하세요. 개인 엑셀이나 복원본을 배포에 넣지 마세요.
+
+## 0.8.12 시간 기록
+
+- `Entry.time=HH:mm:ss`; 이전 생성자와 시간 없는 파일은 자정입니다. DB1~4→5는 기존 rowid/ID/거래 필드·feature_state·설정 보존 및 실패 롤백이 필수입니다.
+- 새 초안은 현재 시각, 수정은 원래 시각을 유지합니다. 사진 기준 달력 다음 → 시계, 뒤로 → 달력, 최종 확인만 반영합니다. 초는 시계의 별도 버튼입니다.
+- A~F 기존 엑셀 열 위치를 바꾸지 않고 G에 시간을 추가했습니다. SMV4/ZIP3이며 이전 코덱 읽기를 유지합니다. 자정 fingerprint는 기존과 같아야 합니다.
+- `TimeTests`, Android `time/timebefore/timeupgrade/timedark`를 확인하세요. 실제 폰에 테스트를 실행하지 않습니다. 합계·원금 보호는 일자 기준으로 유지합니다. 새 권한·외부 라이브러리는 없습니다.
 
 ## 최근 핵심
 

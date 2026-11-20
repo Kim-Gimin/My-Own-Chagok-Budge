@@ -21,7 +21,7 @@ final class AssetGuardChecks {
  static void upgraded(DeviceChecks t)throws Exception{
   Context ctx=t.getTargetContext();String before;try(java.io.InputStream in=new java.io.FileInputStream(new java.io.File(ctx.getExternalFilesDir(null),"asset-upgrade-before.txt"));java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()){byte[] b=new byte[4096];int n;while((n=in.read(b))!=-1)out.write(b,0,n);before=new String(out.toByteArray(),java.nio.charset.StandardCharsets.UTF_8);}
   t.eq(before,snapshot(t));t.eq("0.8.4",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);t.eq(18,ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionCode);
-  try(LedgerDb db=new LedgerDb(ctx)){t.eq(4,db.getReadableDatabase().getVersion());t.eq(8,db.all().size());t.eq(2,db.movements().size());Map<String,Long> balances=OpeningAsset.balances(db.openingAssets(),db.all(),"2026-12-31",db.movements());t.eq(0L,balances.get("저축 · 적금"));t.eq(0L,balances.get("저축 · 예금"));t.eq(1000L,balances.get("저축 · 다른 예금"));t.eq(110L,balances.get("현금 · 거래 후 잔액"));}
+  try(LedgerDb db=new LedgerDb(ctx)){t.eq(t.schemaVersion(),db.getReadableDatabase().getVersion());t.eq(8,db.all().size());t.eq(2,db.movements().size());Map<String,Long> balances=OpeningAsset.balances(db.openingAssets(),db.all(),"2026-12-31",db.movements());t.eq(0L,balances.get("저축 · 적금"));t.eq(0L,balances.get("저축 · 예금"));t.eq(1000L,balances.get("저축 · 다른 예금"));t.eq(110L,balances.get("현금 · 거래 후 잔액"));}
  }
  static LedgerDb fresh(Context ctx){ctx.deleteDatabase("chagok.db");return new LedgerDb(ctx);}
  static OpeningAsset basis(String id,long amount){return new OpeningAsset(id,"2026-01-01","저축",amount,"적금",id);}

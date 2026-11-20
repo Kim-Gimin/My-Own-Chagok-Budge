@@ -6,18 +6,19 @@ import android.database.sqlite.*;
 import java.util.*;
 
 final class LedgerDb extends SQLiteOpenHelper {
-    LedgerDb(Context context) { super(context, "chagok.db", null, 4); }
+    LedgerDb(Context context) { super(context, "chagok.db", null, 5); }
     @Override public void onCreate(SQLiteDatabase db) {
         createEntries(db,"entries");
         createPlanning(db);
         db.execSQL("CREATE INDEX entries_date ON entries(date)");
+        db.execSQL("CREATE INDEX entries_date_time ON entries(date,time)");
     }
     private static void createEntries(SQLiteDatabase db,String table) {
-        db.execSQL("CREATE TABLE "+table+" (id TEXT PRIMARY KEY NOT NULL, date TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('수입','지출','저축','투자','저축회수')), amount INTEGER NOT NULL CHECK(amount>0 AND amount<=999999999999), category TEXT NOT NULL, memo TEXT NOT NULL)");
+        db.execSQL("CREATE TABLE "+table+" (id TEXT PRIMARY KEY NOT NULL, date TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('수입','지출','저축','투자','저축회수')), amount INTEGER NOT NULL CHECK(amount>0 AND amount<=999999999999), category TEXT NOT NULL, memo TEXT NOT NULL, time TEXT NOT NULL DEFAULT '00:00:00' CHECK(time GLOB '[0-2][0-9]:[0-5][0-9]:[0-5][0-9]' AND substr(time,1,2)<='23'))");
     }
     private static void createPlanning(SQLiteDatabase db){db.execSQL("CREATE TABLE feature_state (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)");}
     @Override public void onUpgrade(SQLiteDatabase db,int from,int to){
-        if(from<1||from>3||to!=4)throw new IllegalStateException("지원하지 않는 데이터 버전입니다.");
+        if(from<1||from>4||to!=5)throw new IllegalStateException("지원하지 않는 데이터 버전입니다.");
         if(from<4) {
             createEntries(db,"entries_next");
             db.execSQL("INSERT INTO entries_next (rowid,id,date,type,amount,category,memo) SELECT rowid,id,date,type,amount,category,memo FROM entries");
@@ -26,6 +27,8 @@ final class LedgerDb extends SQLiteOpenHelper {
             db.execSQL("CREATE INDEX entries_date ON entries(date)");
         }
         if(from<3)createPlanning(db);
+        if(from==4)db.execSQL("ALTER TABLE entries ADD COLUMN time TEXT NOT NULL DEFAULT '00:00:00' CHECK(time GLOB '[0-2][0-9]:[0-5][0-9]:[0-5][0-9]' AND substr(time,1,2)<='23')");
+        db.execSQL("CREATE INDEX entries_date_time ON entries(date,time)");
     }
     PlanningData planning(){
         try(Cursor c=getReadableDatabase().query("feature_state",new String[]{"value"},"key=?",new String[]{"planning"},null,null,null)){return c.moveToFirst()?PlanningData.decode(c.getString(0)):new PlanningData();}
@@ -49,14 +52,15 @@ final class LedgerDb extends SQLiteOpenHelper {
     }
     List<Ledger.Entry> all() {
         List<Ledger.Entry> result = new ArrayList<>();
-        try (Cursor c = getReadableDatabase().query("entries", null, null, null, null, null, "date DESC, rowid DESC")) {
-            while (c.moveToNext()) result.add(new Ledger.Entry(c.getString(0), c.getString(1), c.getString(2), c.getLong(3), c.getString(4), c.getString(5), 0));
+        try (Cursor c = getReadableDatabase().query("entries", null, null, null, null, null, "date DESC, time DESC, rowid DESC")) {
+            while (c.moveToNext()) result.add(entry(c));
         }
         return result;
     }
+    private static Ledger.Entry entry(Cursor c){return new Ledger.Entry(c.getString(0),c.getString(1),c.getString(c.getColumnIndexOrThrow("time")),c.getString(2),c.getLong(3),c.getString(4),c.getString(5),0);}
     private ContentValues values(Ledger.Entry e) {
         ContentValues v = new ContentValues();
-        v.put("id",e.id); v.put("date",e.date); v.put("type",e.type); v.put("amount",e.amount); v.put("category",e.category); v.put("memo",e.memo);
+        v.put("id",e.id); v.put("date",e.date); v.put("time",e.time); v.put("type",e.type); v.put("amount",e.amount); v.put("category",e.category); v.put("memo",e.memo);
         return v;
     }
     private AssetConsistency.State assetState(){return new AssetConsistency.State(openingAssets(),all(),movements());}
@@ -101,7 +105,7 @@ final class LedgerDb extends SQLiteOpenHelper {
     SavingsMovement movement(String id){for(SavingsMovement m:movements())if(m.id.equals(id))return m;return null;}
     void putMovement(SavingsMovement m){ContentValues v=new ContentValues();v.put("key","movement:"+m.id);v.put("value",m.encode());SQLiteDatabase sql=getWritableDatabase();if(sql.update("feature_state",v,"key=?",new String[]{"movement:"+m.id})==0&&sql.insert("feature_state",null,v)<0)throw new IllegalStateException("이동 저장 실패");}
     void checkIncomingMovements(BackupArchive.Snapshot snapshot){Map<String,Ledger.Entry> rows=new HashMap<>();for(Ledger.Entry e:snapshot.entries)rows.put(e.id,e);for(SavingsMovement m:snapshot.movements){OpeningAsset required=m.opening();if(required!=null&&!snapshot.openingAssets.stream().anyMatch(a->a.id.equals(required.id)&&a.fingerprint().equals(required.fingerprint())))throw new IllegalArgumentException("이동과 연결 기초자산이 일치하지 않아요.");SavingsMovement old=movement(m.id);if(old!=null&&!old.encode().equals(m.encode()))throw new IllegalArgumentException("같은 ID의 저축 이동 내용이 달라요.");for(Ledger.Entry e:m.entries())if(!rows.containsKey(e.id)||!rows.get(e.id).sameContent(e))throw new IllegalArgumentException("저축 이동과 연결 내역이 일치하지 않아요.");}}
-    void saveMovement(SavingsMovement m,boolean delete){SQLiteDatabase sql=getWritableDatabase();sql.beginTransaction();try{AssetConsistency.State guardBefore=guardState();SavingsMovement old=movement(m.id);if(old==null&&delete)throw new IllegalArgumentException("이동을 찾지 못했어요.");if(old!=null){for(Ledger.Entry e:old.entries()){try(Cursor c=sql.query("entries",null,"id=?",new String[]{e.id},null,null,null)){if(!c.moveToFirst()||!new Ledger.Entry(c.getString(0),c.getString(1),c.getString(2),c.getLong(3),c.getString(4),c.getString(5),0).sameContent(e))throw new IllegalArgumentException("연결 내역이 바뀌었어요. 백업 내역을 확인하세요.");}sql.delete("entries","id=?",new String[]{e.id});}}else for(SavingsMovement saved:movements())if(saved.date.equals(m.date)&&saved.source.equals(m.source)&&saved.principal==m.principal&&saved.received==m.received&&saved.saving==m.saving&&saved.investment==m.investment&&saved.savingCategory.equals(m.savingCategory)&&saved.investmentCategory.equals(m.investmentCategory)&&saved.memo.equals(m.memo)&&saved.previousPrincipal==m.previousPrincipal&&saved.government==m.government&&saved.createOpening==m.createOpening&&saved.detailed==m.detailed)throw new IllegalArgumentException("같은 날짜·금액의 이동이 이미 있어요.");
+    void saveMovement(SavingsMovement m,boolean delete){SQLiteDatabase sql=getWritableDatabase();sql.beginTransaction();try{AssetConsistency.State guardBefore=guardState();SavingsMovement old=movement(m.id);if(old==null&&delete)throw new IllegalArgumentException("이동을 찾지 못했어요.");if(old!=null){for(Ledger.Entry e:old.entries()){try(Cursor c=sql.query("entries",null,"id=?",new String[]{e.id},null,null,null)){if(!c.moveToFirst()||!entry(c).sameContent(e))throw new IllegalArgumentException("연결 내역이 바뀌었어요. 백업 내역을 확인하세요.");}sql.delete("entries","id=?",new String[]{e.id});}}else for(SavingsMovement saved:movements())if(saved.date.equals(m.date)&&saved.time.equals(m.time)&&saved.source.equals(m.source)&&saved.principal==m.principal&&saved.received==m.received&&saved.saving==m.saving&&saved.investment==m.investment&&saved.savingCategory.equals(m.savingCategory)&&saved.investmentCategory.equals(m.investmentCategory)&&saved.memo.equals(m.memo)&&saved.previousPrincipal==m.previousPrincipal&&saved.government==m.government&&saved.createOpening==m.createOpening&&saved.detailed==m.detailed)throw new IllegalArgumentException("같은 날짜·금액의 이동이 이미 있어요.");
         replaceMovementOpening(old,m,delete);
         if(delete)sql.delete("feature_state","key=?",new String[]{"movement:"+m.id});else{for(Ledger.Entry e:m.entries())sql.insertOrThrow("entries",null,values(e));putMovement(m);}validateAssets(guardBefore);sql.setTransactionSuccessful();}finally{sql.endTransaction();}}
 }

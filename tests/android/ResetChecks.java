@@ -86,7 +86,7 @@ final class ResetChecks {
         t.eq(null,ctx.getSystemService(JobScheduler.class).getPendingJob(BackupReminderService.JOB));
         try(LedgerDb db=new LedgerDb(ctx)){
             t.eq(0,db.all().size());t.eq(0,db.openingAssets().size());t.eq(0,db.movements().size());
-            try(android.database.Cursor c=db.getReadableDatabase().rawQuery("SELECT count(*) FROM feature_state",null)){c.moveToFirst();t.eq(0L,c.getLong(0));}t.eq(4,db.getReadableDatabase().getVersion());
+            try(android.database.Cursor c=db.getReadableDatabase().rawQuery("SELECT count(*) FROM feature_state",null)){c.moveToFirst();t.eq(0L,c.getLong(0));}t.eq(t.schemaVersion(),db.getReadableDatabase().getVersion());
         }
         AppPreferences prefs=new AppPreferences(ctx);t.eq(false,prefs.hasPin());t.eq(false,prefs.dark());t.eq("system",prefs.fontId());t.eq(5,prefs.startTab());
         Activity app=t.startActivitySync(new Intent(ctx,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));t.waitForIdleSync();

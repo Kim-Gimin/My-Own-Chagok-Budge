@@ -23,7 +23,7 @@ final class HistoryData {
         String query=memo.trim().toLowerCase(Locale.KOREA);List<Ledger.Entry> entries=new ArrayList<>();
         for(Ledger.Entry entry:all)if((month==null||entry.date.startsWith(month.toString()+"-"))&&(type.isEmpty()||Ledger.matches(entry,type))&&(categories.isEmpty()||categories.contains(entry.category))&&(query.isEmpty()||entry.memo.toLowerCase(Locale.KOREA).contains(query)))entries.add(entry);
         Collator collator=Collator.getInstance(Locale.KOREA);
-        entries.sort((a,b)->{if(sort==CATEGORY){int c=collator.compare(a.category,b.category);if(c==0)c=a.category.compareTo(b.category);if(c!=0)return c;}return b.date.compareTo(a.date);});
+        entries.sort((a,b)->{if(sort==CATEGORY){int c=collator.compare(a.category,b.category);if(c==0)c=a.category.compareTo(b.category);if(c!=0)return c;}return Ledger.newestFirst().compare(a,b);});
         List<Month> groups=new ArrayList<>();long[] total=new long[Ledger.TYPES.length];Month current=null;Day day=null;
         for(Ledger.Entry entry:entries){YearMonth yearMonth=YearMonth.from(LocalDate.parse(entry.date));String category=sort==CATEGORY?entry.category:"";
             if(current==null||!current.month.equals(yearMonth)||!current.category.equals(category)){current=new Month(yearMonth,category);groups.add(current);day=null;}

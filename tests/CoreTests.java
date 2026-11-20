@@ -94,7 +94,7 @@ public final class CoreTests {
         byte[] bytes=export(entries,false);Map<String,String> parts=unzip(bytes);String book=parts.get("xl/workbook.xml"),detail=parts.get("xl/worksheets/sheet2.xml"),summary=parts.get("xl/worksheets/sheet1.xml");
         eq(true,book.indexOf("name=\"요약\"")<book.indexOf("name=\"내역\""));eq(true,book.indexOf("name=\"내역\"")<book.indexOf("name=\"사용 안내\""));
         String[] labels={"날짜","내역","상세 분류","금액","돈의 성격","고유ID"};for(int i=0;i<labels.length;i++)eq(true,detail.contains(s((char)('A'+i)+"1",labels[i]).replace(" t=\"inlineStr\""," t=\"inlineStr\" s=\"1\"").replace("<t>","<t xml:space=\"preserve\">")));
-        eq("3000000",cached(detail,"D2"));eq("-500000",cached(detail,"D3"));eq("-700000",cached(detail,"D4"));eq("-400000",cached(detail,"D5"));eq(true,detail.contains("A1:F5"));eq(false,detail.contains("계좌"));
+        eq("3000000",cached(detail,"D2"));eq("-500000",cached(detail,"D3"));eq("-700000",cached(detail,"D4"));eq("-400000",cached(detail,"D5"));eq(true,detail.contains("A1:G5"));eq(false,detail.contains("계좌"));
         eq(true,detail.contains("sqref=\"E2:E10001\""));eq(true,detail.contains("errorStyle=\"stop\""));eq(true,detail.contains("showDropDown=\"0\""));eq(true,detail.contains("수입,지출,저축,투자"));
         eq(true,detail.contains("r=\"F2\" t=\"inlineStr\" s=\"0\"><is><t xml:space=\"preserve\">income</t>"));eq(true,parts.get("xl/styles.xml").contains("+#,##0;-#,##0;0"));
         eq(true,summary.contains("SUMIFS('내역'!$D$2:$D$5,'내역'!$E$2:$E$5"));
@@ -111,7 +111,7 @@ public final class CoreTests {
         parts=unzip(export(Collections.emptyList(),false));summary=parts.get("xl/worksheets/sheet1.xml");eq(true,summary.contains("기록 없음"));for(int r=3;r<=13;r++)eq("0",cached(summary,"B"+r));eq(0,read(export(Collections.emptyList(),false)).entries.size());
         parts=unzip(export(Collections.emptyList(),true));eq(false,parts.get("xl/workbook.xml").contains("name=\"요약\""));eq(true,parts.get("xl/worksheets/sheet1.xml").contains("수입,지출,저축,투자"));eq(true,parts.get("xl/worksheets/sheet1.xml").contains("돈의 성격"));
         eq(true,parts.get("xl/worksheets/sheet1.xml").contains("sqref=\"E2:E10001\""));
-        eq(true,parts.get("xl/worksheets/sheet1.xml").contains("A1:F1"));
+        eq(true,parts.get("xl/worksheets/sheet1.xml").contains("A1:G1"));
         eq(true,parts.get("xl/workbook.xml").contains("name=\"입력예시\""));
         eq(true,parts.get("xl/workbook.xml").contains("activeTab=\"2\""));
         eq(true,parts.get("xl/worksheets/sheet1.xml").contains("showInputMessage=\"1\""));

@@ -26,7 +26,7 @@ Gradle 디버그 구성도 루트의 기존 `local-test.keystore`를 참조합�
 
 ```powershell
 .	est-core.ps1 -Jdk 'C:\Tools\jdk-17' `
-  -TemplateFile '.\templates\chagok-input-0.8.11.xlsx'
+  -TemplateFile '.\templates\chagok-input-0.8.12.xlsx'
 ```
 
 최신 0.8.11 기준 기존 검사는 1103개입니다. 회계/엑셀 10,000행/기초자산·원금 보호/계획·생활비/분류 정리/계획 XLSX를 검사합니다. 현재 이관 검증의 실제 결과는 [검증 기록](PRIVACY_VALIDATION.md)을 따릅니다.
@@ -47,3 +47,7 @@ Gradle 디버그 구성도 루트의 기존 `local-test.keystore`를 참조합�
 
 
 공개 예시·테스트는 가상 데이터만 사용합니다. 예전 문서·바이너리를 공개 이력에 다시 넣지 않습니다. 과거 클론 대신 OneDrive 밖의 새 클론을 사용하세요.
+
+## 0.8.12 시각 검사
+
+`test-core.ps1`은 `TimeTests`를 포함합니다. Android `-Mode time`은 DB1~4 이관·실패 롤백·선택 취소·입력/수정·정렬·연결 시각을 검사하고 `timedark`는 다크 모드에서도 검사합니다. `timebefore`는 0.8.11 APK에 합성 자료를 만들며, 같은 서명 0.8.12를 `adb install -r`로 업데이트한 뒤 `timeupgrade`로 필드/rowid/feature_state/설정 보존과 자정을 비교합니다. 테스트는 전용 에뮬레이터에서만 실행합니다.

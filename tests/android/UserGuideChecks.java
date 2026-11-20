@@ -38,7 +38,7 @@ final class UserGuideChecks {
         t.eq(before,AssetGuardChecks.snapshot(t));
         t.eq("0.8.11",ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionName);
         t.eq(25,ctx.getPackageManager().getPackageInfo(ctx.getPackageName(),0).versionCode);
-        try(LedgerDb db=new LedgerDb(ctx)){t.eq(4,db.getReadableDatabase().getVersion());t.eq(1,db.movements().size());t.eq(1,db.openingAssets().size());t.eq(1,db.planning().favorites.size());t.eq(true,db.planning().hasLivingFilter());t.eq(2,db.planning().livingCategories().size());}
+        try(LedgerDb db=new LedgerDb(ctx)){t.eq(t.schemaVersion(),db.getReadableDatabase().getVersion());t.eq(1,db.movements().size());t.eq(1,db.openingAssets().size());t.eq(1,db.planning().favorites.size());t.eq(true,db.planning().hasLivingFilter());t.eq(2,db.planning().livingCategories().size());}
     }
     static Object get(Object obj,String key)throws Exception{Field f=MainActivity.class.getDeclaredField(key);f.setAccessible(true);return f.get(obj);}
     static void click(DeviceChecks t,MainActivity app,String description)throws Exception{
