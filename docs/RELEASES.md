@@ -19,10 +19,10 @@
 | 0.6.2-full-comparison | 11 | 2026-11-10 | 거래분류판과 앱 코드가 같은 보관판 | [v0.6.2-full-comparison](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.6.2-full-comparison) |
 | 0.6.2-screen-unified | 11 | 2026-11-11 | 화면 통일 | [v0.6.2-screen-unified](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.6.2-screen-unified) |
 | 0.6.2-lifestyle | 11 | 2026-11-13 | 예산·반복·추이·즐겨찾기·목표·계획 ZIP·DB3 | [v0.6.2-lifestyle](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.6.2-lifestyle) |
-| 0.7.0 | 12 | 2026-11-15 | 생활관리 별도 버전; 소스 미발견 | 소스 미발견 |
+| 0.7.0 | 12 | 2026-11-15 | [생활관리 확장·실제 버전 표시](releases/0.7.0.md) | [복구 소스](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/archive/v0.7.0-recovered) |
 | 0.7.1 | 13 | 2026-11-15 | 엑셀6열·양수 금액·입력 예시 | [v0.7.1](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.7.1) |
 | 0.8.0 | 14 | 2026-11-15 | DB4·저축회수·만기 재배분; 소스 미발견 | 소스 미발견 |
-| 0.8.1 | 15 | 2026-11-16 | 연결 내역의 이동 전체 수정 | [v0.8.1](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.1) |
+| 0.8.1 | 15 | 2026-11-16 | [연결 내역의 이동 전체 수정](releases/0.8.1.md) | [v0.8.1](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.1) |
 | 0.8.2 | 16 | 2026-11-16 | 저축회수 직접 입력 | [v0.8.2](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.2) |
 | 0.8.3 | 17 | 2026-11-16 | 기초자산·실제 금액 배분·기여금 분리 | [v0.8.3](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.3) |
 | 0.8.4 | 18 | 2026-11-16 | 시점별 원금·잔액 보호 | [v0.8.4](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.4) |
@@ -34,6 +34,12 @@
 | 0.8.10 | 24 | 2026-11-19 | 전체 XLSX 계획 시트·유형별 분류 선택 | [v0.8.10](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.10) |
 | 0.8.11 | 25 | 2026-11-19 | 가상 예시·공개 자료 정리, 사용자 데이터 보존 | [v0.8.11](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.11) |
 
-과거 소스 태그 26개와 새 v0.8.11 태그를 사용합니다. 0.8.1은 보관 ZIP에서 확인했습니다. 거래분류판과 전체비교판은 앱 코드가 같지만 화면통일판과는 다릅니다.
+과거 소스 태그 26개와 새 v0.8.11 태그, 0.7.0 복구 소스 브랜치를 사용합니다. 0.8.1은 보관 ZIP에서 확인해 이미 공개된 태그이며, 위 변경 내용 링크에서 자세한 동작을 볼 수 있습니다. 거래분류판과 전체비교판은 앱 코드가 같지만 화면통일판과는 다릅니다.
 
 실제 사례가 포함된 과거 APK·양식은 공개하지 않습니다. [Release](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/latest)에는 가상 예시로 검증한 새 배포물만 올립니다. 개인 원본 자료와 서명키는 로컬 별도 보관입니다.
+
+## 0.7.0·0.8.1 보강 — 2026-11-20
+
+- **0.7.0:** 원래 소스 ZIP 미발견 기록을 유지하되, 이전 보관 소스에서 재구성해 보관 APK와 대조 검증한 [복구 소스](releases/0.7.0.md)를 추가했습니다. 새로 찾은 원본 개발 커밋으로 가장하지 않습니다. 복구 소스에는 생활관리 기능과 실제 설치 버전 표시 개선이 반영돼 있습니다.
+- **0.8.1:** 기존 `v0.8.1` 태그의 [전체 소스·ZIP·기능 설명](releases/0.8.1.md)을 명확히 연결했습니다. 저축회수 직접 입력은 0.8.2 변경과 구분합니다.
+- 이번 변경은 과거 소스와 설명의 보강입니다. 최신 앱 버전·DB·사용자 데이터는 바꾸지 않았으며 원본 과거 APK·개인 자료·키는 공개하지 않습니다.
