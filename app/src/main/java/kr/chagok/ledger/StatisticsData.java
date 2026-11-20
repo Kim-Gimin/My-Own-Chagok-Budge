@@ -48,13 +48,6 @@ final class StatisticsData {
         }
     }
     static Comparison compare(List<Ledger.Entry> entries){return new Comparison(Ledger.totals(entries));}
-    /** Money kept: saving (net of withdrawals) + investment. */
-    static long saved(long[] totals){return Math.addExact(totals[2],totals[3]);}
-    /** Percent of income: expense, saving, investment, saved (saving+investment), remaining. Null without income. */
-    static double[] incomeShares(long[] totals){
-        if(totals[0]<=0)return null;double income=totals[0];
-        return new double[]{totals[1]*100.0/income,totals[2]*100.0/income,totals[3]*100.0/income,saved(totals)*100.0/income,Ledger.available(totals)*100.0/income};
-    }
     static Summary aggregate(List<Ledger.Entry> entries,String type){
         String kind=Ledger.normalizeType(type);Map<String,Long> groups=new HashMap<>();long total=0;
         for(Ledger.Entry entry:entries)if(Ledger.matches(entry,kind)){

@@ -82,17 +82,10 @@ public final class XlsxIO {
         String rate=totals[0]==0?"0":BigDecimal.valueOf(totals[2]).divide(BigDecimal.valueOf(totals[0]),java.math.MathContext.DECIMAL64).toPlainString();
         sheet.append("<row r=\"7\">").append(textCell("A7","남은 돈",6)).append(formulaCell("B7","B3-B4-B5-B6",Long.toString(Ledger.available(totals)),3)).append("</row>");
         sheet.append("<row r=\"8\">").append(textCell("A8","저축률",6)).append(formulaCell("B8","IF(B3>0,B5/B3,0)",rate,5)).append("</row>");
-        long saved=Math.addExact(totals[2],totals[3]);
-        sheet.append("<row r=\"9\">").append(textCell("A9","투자률",6)).append(formulaCell("B9","IF(B3>0,B6/B3,0)",ratio(totals[3],totals[0]),5)).append("</row>");
-        sheet.append("<row r=\"10\">").append(textCell("A10","모은 돈 (저축+투자)",6)).append(formulaCell("B10","B5+B6",Long.toString(saved),3)).append("</row>");
-        sheet.append("<row r=\"11\">").append(textCell("A11","모은 비율 (저축+투자)",6)).append(formulaCell("B11","IF(B3>0,B10/B3,0)",ratio(saved,totals[0]),5)).append("</row>");
-        sheet.append("<row r=\"12\">").append(textCell("A12","지출률",6)).append(formulaCell("B12","IF(B3>0,B4/B3,0)",ratio(totals[1],totals[0]),5)).append("</row>");
-        sheet.append("<row r=\"13\">").append(textCell("A13","남은 돈 비율",6)).append(formulaCell("B13","IF(B3>0,B7/B3,0)",ratio(Ledger.available(totals),totals[0]),5)).append("</row>");
-        String[] notes={"돈의 성격: 수입·지출·저축·투자 / 상세 분류: 월급·식비·적금·주식 등", "저축과 투자, 이체는 지출 합계에 포함하지 않아요. 앱에는 이체 기록이 없어요.", "남은 돈 = 수입 − 지출 − 저축 − 투자. 모은 비율 = (저축 + 투자) ÷ 수입이에요.", "지출률 + 저축률 + 투자률 + 남은 돈 비율 = 100%예요. 수입이 없으면 비율은 0%로 표시해요.", "기존에 저장한 돈의 성격을 그대로 내보내며, 상세 분류로 자동 변경하지 않아요."};
-        for(int i=0;i<notes.length;i++) sheet.append("<row r=\"").append(i+15).append("\">").append(textCell("A"+(i+15),notes[i],0)).append("</row>");
+        String[] notes={"돈의 성격: 수입·지출·저축·투자 / 상세 분류: 월급·식비·적금·주식 등", "저축과 투자, 이체는 지출 합계에 포함하지 않아요. 앱에는 이체 기록이 없어요.", "남은 돈 = 수입 − 지출 − 저축 − 투자. 저축률에는 저축만 포함해요.", "기존에 저장한 돈의 성격을 그대로 내보내며, 상세 분류로 자동 변경하지 않아요."};
+        for(int i=0;i<notes.length;i++) sheet.append("<row r=\"").append(i+10).append("\">").append(textCell("A"+(i+10),notes[i],0)).append("</row>");
         return sheet.append("</sheetData></worksheet>").toString();
     }
-    private static String ratio(long part,long income){return income<=0?"0":BigDecimal.valueOf(part).divide(BigDecimal.valueOf(income),java.math.MathContext.DECIMAL64).toPlainString();}
     private static String numberCell(String address,String value,int style) { return "<c r=\""+address+"\" s=\""+style+"\"><v>"+value+"</v></c>"; }
     private static String formulaCell(String address,String formula,String value,int style) { return "<c r=\""+address+"\" s=\""+style+"\"><f>"+escape(formula)+"</f><v>"+value+"</v></c>"; }
     private static String exampleSheet() {

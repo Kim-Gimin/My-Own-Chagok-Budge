@@ -20,10 +20,7 @@ public final class MaturityTests {
   {ByteArrayOutputStream ub=new ByteArrayOutputStream();XlsxIO.write(ub,synthetic.entries(),false);XlsxIO.ReadResult ur=XlsxIO.read(new ByteArrayInputStream(ub.toByteArray()));eq(0,ur.invalidRows);eq(0L,Ledger.available(Ledger.totals(ur.entries)));}
   for(long[] invalid:new long[][]{{0,100,100,0},{100,-1,0,0},{100,100,-1,0},{100,100,0,-1},{100,100,Ledger.MAX_AMOUNT+1,0}}){try{m(invalid[0],invalid[1],invalid[2],invalid[3]);throw new AssertionError("accepted invalid allocation");}catch(IllegalArgumentException expected){n++;}}
   ByteArrayOutputStream b=new ByteArrayOutputStream();BackupArchive.write(b,recovered.entries(),new PlanningData(),Collections.singletonList(recovered));BackupArchive.Snapshot restored=BackupArchive.read(new ByteArrayInputStream(b.toByteArray()));eq(recovered.encode(),restored.movements.get(0).encode());eq(1150000L,Ledger.available(Ledger.totals(restored.entries)));
-  long[] q={10000000,4000000,2000000,3000000};double[] sh=StatisticsData.incomeShares(q);eq(5000000L,StatisticsData.saved(q));eq(1000000L,Ledger.available(q));
-  eq("40.0",String.format(Locale.ROOT,"%.1f",sh[0]));eq("20.0",String.format(Locale.ROOT,"%.1f",sh[1]));eq("30.0",String.format(Locale.ROOT,"%.1f",sh[2]));eq("50.0",String.format(Locale.ROOT,"%.1f",sh[3]));eq("10.0",String.format(Locale.ROOT,"%.1f",sh[4]));
-  eq(true,Math.abs(100-(sh[0]+sh[1]+sh[2]+sh[4]))<1e-9);eq(null,StatisticsData.incomeShares(new long[]{0,100,0,0}));
-  long[] withdrawn=Ledger.totals(synthetic.entries());double[] ws=StatisticsData.incomeShares(withdrawn);eq(true,ws[1]<0);eq(200000L,StatisticsData.saved(withdrawn));eq(100.0,ws[3]);
+  eq(200000L,Math.addExact(u[2],u[3])); // Net saving plus investment; no later display-ratio helper.
   System.out.println("PASS: "+n+" maturity/allocation checks");
  }
 }

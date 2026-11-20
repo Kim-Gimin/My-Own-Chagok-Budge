@@ -485,13 +485,9 @@ public final class MainActivity extends Activity {
         long[] periodTotals=Ledger.totals(periodEntries);space(page,24);line(page);
         statisticsAmountRow(page,"선택 기간 사용 가능",Ledger.available(periodTotals),-1,false);
         page.addView(label("수입 − 지출 − 저축 − 투자",11,MUTED));space(page,8);
-        double[] shares=StatisticsData.incomeShares(periodTotals);
-        page.addView(label(shares==null?"수입을 기록하면 저축률·투자률·모은 비율을 볼 수 있어요.":String.format(Locale.KOREA,"수입 대비 지출 %.1f%% · 저축 %.1f%% · 투자 %.1f%%",shares[0],shares[1],shares[2]),11,MUTED));
-        if(shares!=null){space(page,6);TextView kept=label(String.format(Locale.KOREA,"모은 비율 (저축+투자) %.1f%% · 모은 돈 ",shares[3])+won(StatisticsData.saved(periodTotals)),13,INK);kept.setContentDescription("수입 대비 모은 비율 "+String.format(Locale.KOREA,"%.1f%%",shares[3])+", 모은 돈 "+won(StatisticsData.saved(periodTotals)));page.addView(kept);}
-        space(page,24);line(page);space(page,18);
+        page.addView(label(periodTotals[0]>0?"수입 대비 저축률 "+String.format(Locale.KOREA,"%.1f%%",periodTotals[2]*100.0/periodTotals[0]):"수입을 기록하면 저축률을 볼 수 있어요.",11,MUTED));space(page,24);line(page);space(page,18);
         page.addView(text("선택 기간 합계",15,INK,true));
         for(int i=0;i<Ledger.TYPES.length;i++)statisticsAmountRow(page,Ledger.TYPES[i],periodTotals[i],COLORS[i],false);
-        statisticsAmountRow(page,"모은 돈 (저축+투자)",StatisticsData.saved(periodTotals),-1,false);
         statisticsAmountRow(page,"사용 가능",Ledger.available(periodTotals),-1,false);
         TextView foot=label("저축과 투자는 지출 통계에 포함하지 않아요.",11,MUTED);page.addView(foot);
     }
