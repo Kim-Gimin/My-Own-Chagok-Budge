@@ -11,16 +11,37 @@ final class CategoryStore {
     List<String> choices(String type,List<Ledger.Entry> entries){return choices(type,entries,new PlanningData());}
     List<String> choices(String type,List<Ledger.Entry> entries,PlanningData plan) {
         String kind=kind(type);
-        return CategoryNames.choices(kind,entries,plan,prefs.getStringSet(kind,Collections.emptySet()),prefs.getStringSet("deleted_"+kind,Collections.emptySet()));
+        List<String> available=CategoryNames.choices(kind,entries,plan,prefs.getStringSet(kind,Collections.emptySet()),prefs.getStringSet("deleted_"+kind,Collections.emptySet()));
+        return CategoryOrder.apply(available,savedOrder(kind));
     }
 
-    boolean remember(String type,String name) {
+    private List<String> savedOrder(String kind){
+        try{return CategoryOrder.decode(prefs.getString("order_"+kind,""));}
+        catch(IllegalArgumentException|ClassCastException ex){return Collections.emptyList();}
+    }
+    boolean move(String type,String name,int delta,List<Ledger.Entry> entries,PlanningData plan){
+        String kind=kind(type);List<String> before=choices(kind,entries,plan),after=CategoryOrder.move(before,name,delta);
+        if(before.equals(after))return false;
+        String value=CategoryOrder.encode(after,savedOrder(kind));
+        if(!prefs.edit().putString("order_"+kind,value).commit())throw new IllegalStateException("상세 분류 순서를 저장하지 못했어요. 다시 시도해 주세요.");
+        return true;
+    }
+
+    boolean remember(String type,String name) {return remember(type,name,null,null);}
+    boolean remember(String type,String name,List<Ledger.Entry> entries,PlanningData plan) {
         String kind=kind(type), cleaned=validate(name);
         Set<String> names=new HashSet<>(CategoryNames.clean(prefs.getStringSet(kind,Collections.emptySet())));
         Set<String> deleted=new HashSet<>(CategoryNames.clean(prefs.getStringSet("deleted_"+kind,Collections.emptySet())));
         boolean restored=deleted.remove(cleaned),added=names.add(cleaned);
         if(!restored&&!added)return false;
-        if(!prefs.edit().putStringSet(kind,names).putStringSet("deleted_"+kind,deleted).commit()) throw new IllegalStateException("상세 분류를 저장하지 못했어요. 다시 시도해 주세요.");
+        SharedPreferences.Editor edit=prefs.edit().putStringSet(kind,names).putStringSet("deleted_"+kind,deleted);
+        List<String> order=savedOrder(kind);
+        if(!order.isEmpty()&&!order.contains(cleaned)){
+            List<String> next=entries==null?new ArrayList<>(order):choices(kind,entries,plan);
+            if(!next.contains(cleaned))next.add(cleaned);
+            edit.putString("order_"+kind,CategoryOrder.encode(next,order));
+        }
+        if(!edit.commit()) throw new IllegalStateException("상세 분류를 저장하지 못했어요. 다시 시도해 주세요.");
         return true;
     }
     boolean delete(String type,String name){

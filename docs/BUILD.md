@@ -26,7 +26,7 @@ Gradle 디버그 구성도 루트의 기존 `local-test.keystore`를 참조합�
 
 ```powershell
 .	est-core.ps1 -Jdk 'C:\Tools\jdk-17' `
-  -TemplateFile '.\templates\chagok-input-0.8.12.xlsx'
+  -TemplateFile '.\templates\chagok-input-0.8.13.xlsx'
 ```
 
 최신 0.8.11 기준 기존 검사는 1103개입니다. 회계/엑셀 10,000행/기초자산·원금 보호/계획·생활비/분류 정리/계획 XLSX를 검사합니다. 현재 이관 검증의 실제 결과는 [검증 기록](PRIVACY_VALIDATION.md)을 따릅니다.
@@ -51,3 +51,7 @@ Gradle 디버그 구성도 루트의 기존 `local-test.keystore`를 참조합�
 ## 0.8.12 시각 검사
 
 `test-core.ps1`은 `TimeTests`를 포함합니다. Android `-Mode time`은 DB1~4 이관·실패 롤백·선택 취소·입력/수정·정렬·연결 시각을 검사하고 `timedark`는 다크 모드에서도 검사합니다. `timebefore`는 0.8.11 APK에 합성 자료를 만들며, 같은 서명 0.8.12를 `adb install -r`로 업데이트한 뒤 `timeupgrade`로 필드/rowid/feature_state/설정 보존과 자정을 비교합니다. 테스트는 전용 에뮬레이터에서만 실행합니다.
+
+## 0.8.13 분류 순서 검사
+
+JVM에 CategoryOrderTests를 포함합니다. Android order/orderdark는 추가·중복·빈 이름·유형별 이동·삭제/복원·입력/예산 선택·데이터 보존·손상된 설정 대체를 검사합니다. order 후 에뮬레이터의 앱 프로세스를 종료하고 orderreopen으로 디스크 저장을 확인합니다. orderbefore는0.8.12, 같은 서명0.8.13 업데이트 뒤 orderupgrade로 기존 DB/시각/계획/설정과 기본 순서 보존을 비교합니다.

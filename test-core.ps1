@@ -5,6 +5,7 @@ New-Item -ItemType Directory -Path $taskTestOutput -Force | Out-Null
 $taskCoreFiles=@("$PSScriptRoot\tests\PlanXlsxTests.java","$PSScriptRoot\tests\CategoryTests.java","$PSScriptRoot\app\src\main\java\kr\chagok\ledger\CategoryNames.java","$PSScriptRoot\app\src\main\java\kr\chagok\ledger\AssetConsistency.java","$PSScriptRoot\tests\AssetGuardTests.java","$PSScriptRoot\tests\OpeningTests.java","$PSScriptRoot\app\src\main\java\kr\chagok\ledger\OpeningAsset.java","$PSScriptRoot\tests\RecoveryTests.java","$PSScriptRoot\tests\MaturityTests.java","$PSScriptRoot\app\src\main\java\kr\chagok\ledger\SavingsMovement.java","$PSScriptRoot\app\src\main\java\kr\chagok\ledger\Ledger.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\HistoryData.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\AmountKeypad.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\StatisticsData.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\StatisticsPeriod.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\OverviewData.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\PinCrypto.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\XlsxIO.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\IconGeometry.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\TransactionType.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\HistoryActionsState.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\PlanningData.java", "$PSScriptRoot\app\src\main\java\kr\chagok\ledger\BackupArchive.java", "$PSScriptRoot\tests\PlanningTests.java", "$PSScriptRoot\tests\CoreTests.java")
 $taskCoreFiles+="$PSScriptRoot\tests\LivingBudgetTests.java"
 $taskCoreFiles+="$PSScriptRoot\tests\TimeTests.java"
+$taskCoreFiles+="$PSScriptRoot\tests\CategoryOrderTests.java","$PSScriptRoot\app\src\main\java\kr\chagok\ledger\CategoryOrder.java"
 & "$Jdk\bin\javac.exe" -encoding UTF-8 -d $taskTestOutput $taskCoreFiles
 if($LASTEXITCODE -ne 0){throw 'Test compilation failed'}
 if($TemplateFile){
@@ -41,3 +42,6 @@ if($LASTEXITCODE -ne 0){throw "Planning XLSX checks failed"}
 
 & "$Jdk\bin\java.exe" -cp $taskTestOutput kr.chagok.ledger.TimeTests
 if($LASTEXITCODE -ne 0){throw "Transaction time checks failed"}
+
+& "$Jdk\bin\java.exe" -cp $taskTestOutput kr.chagok.ledger.CategoryOrderTests
+if($LASTEXITCODE -ne 0){throw "Category order checks failed"}

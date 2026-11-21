@@ -298,7 +298,7 @@ public final class MainActivity extends Activity {
         settingItem("예산·목표·반복 관리","예산, 납입 목표와 자주 쓰는 기록을 관리해요.",()->navigate(7));
         settingItem("월별 추이·전월 비교","최근 6개월 또는 12개월의 네 유형을 비교해요.",()->navigate(8));
         space(page,16);settingItem("홈 화면 커스텀","오늘·이번 주·이번 달·올해·전체의 수입, 지출, 저축, 투자, 합계를 골라 표시해요.",this::customizeHome);
-        settingItem("상세 분류 관리","수입·지출·저축·투자 상세 분류를 삭제하거나 복원해요. 기존 거래는 유지해요.",()->manageCategories("지출",null));
+        settingItem("상세 분류 관리","수입·지출·저축·투자 분류를 추가하고 ↑ ↓로 순서를 바꿔요. 삭제·복원도 할 수 있어요.",()->manageCategories("지출",null));
         settingItem("시작 화면 설정","기본 시작 화면은 홈이에요. 원하는 시작 화면으로 바꿀 수 있어요.",this::chooseStartScreen);
         settingItem("폰트 설정","휴대폰 기본 글꼴, 나눔고딕, 나눔명조를 선택해요.",this::chooseFont);
         LinearLayout dark=card(page);Switch toggle=new Switch(this);toggle.setText("다크 모드");toggle.setTextSize(16);toggle.setTextColor(INK);toggle.setTypeface(appFont,Typeface.BOLD);toggle.setChecked(preferences.dark());toggle.setContentDescription("다크 모드");dark.addView(toggle);toggle.setOnCheckedChangeListener((v,on)->{preferences.dark(on);applyAppearance();render();});
@@ -771,11 +771,36 @@ public final class MainActivity extends Activity {
             .setNeutralButton("상세 분류 관리",(d,w)->manageCategories(type,(kind,name)->{if(clearDeleted&&kind.equals(CategoryStore.kind(type))&&Ledger.cleanCategory(category.getText().toString()).equals(name))category.setText("");}))
             .setPositiveButton("새 상세 분류 추가",(d,w)->addCategory(type,category)).show();
     }
-    private void manageCategories(String initial,java.util.function.BiConsumer<String,String> removed){
-        final String[] type={CategoryStore.kind(initial)};LinearLayout form=column();form.setPadding(dp(18),dp(8),dp(18),dp(8));form.addView(label("상세 분류만 삭제하며 기존 기록과 합계는 유지해요.",12,MUTED));space(form,12);LinearLayout tabs=row(),list=column();TextView[] labels=new TextView[Ledger.TYPES.length];final Runnable[] refresh={null};refresh[0]=()->{for(int i=0;i<Ledger.TYPES.length;i++){boolean active=Ledger.TYPES[i].equals(type[0]);labels[i].setTextColor(active?Color.WHITE:COLORS[i]);labels[i].setBackground(bg(active?COLORS[i]:SUBTLE,10));labels[i].setSelected(active);}list.removeAllViews();List<String> choices=categories.choices(type[0],db.all(),db.planning());if(choices.isEmpty()){space(list,20);list.addView(label("상세 분류가 없어요. 새 상세 분류를 추가하거나 복원하세요.",13,MUTED));}for(String name:choices){LinearLayout r=row();r.setPadding(0,dp(4),0,dp(4));TextView title=text(name,14,INK,true);title.setMaxLines(3);r.addView(title,new LinearLayout.LayoutParams(0,-2,1));TextView delete=button("삭제",RED,false,()->{});delete.setPadding(dp(12),dp(10),dp(12),dp(10));delete.setContentDescription(type[0]+" "+name+" 상세 분류 삭제");delete.setOnClickListener(v->{String kind=type[0];try{categories.delete(kind,name);if(removed!=null)removed.accept(kind,name);refresh[0].run();}catch(Exception ex){error("상세 분류를 삭제하지 못했어요",message(ex));}});r.addView(delete,new LinearLayout.LayoutParams(dp(65),dp(44)));list.addView(r);}};
-        for(int i=0;i<Ledger.TYPES.length;i++){final int index=i;TextView label=text(Ledger.TYPES[i],14,COLORS[i],true);label.setGravity(Gravity.CENTER);label.setContentDescription(Ledger.TYPES[i]+" 상세 분류 관리");labels[i]=label;LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(40),1);if(i>0)p.leftMargin=dp(6);tabs.addView(label,p);label.setOnClickListener(v->{type[0]=Ledger.TYPES[index];refresh[0].run();});}form.addView(tabs);space(form,12);form.addView(list);ScrollView scroll=new ScrollView(this);scroll.addView(form);AlertDialog dialog=new AlertDialog.Builder(this).setTitle("상세 분류 관리").setView(scroll).setPositiveButton("닫기",null).setNeutralButton("삭제한 상세 분류 복원",null).create();dialog.setOnShowListener(d->dialog.getButton(-3).setOnClickListener(v->{List<String> deleted=categories.deleted(type[0]);if(deleted.isEmpty()){toast("삭제한 상세 분류가 없어요.");return;}new AlertDialog.Builder(this).setTitle(type[0]+" 상세 분류 복원").setItems(deleted.toArray(new String[0]),(window,index)->{categories.remember(type[0],deleted.get(index));refresh[0].run();}).setNegativeButton("취소",null).show();}));refresh[0].run();dialog.show();
+    private TextView categoryMove(String glyph,String description,boolean enabled,Runnable action){
+        TextView move=button(glyph,INK,false,action);move.setPadding(0,0,0,0);move.setSingleLine(true);move.setTextSize(22);move.setBackground(bg(SUBTLE,10));move.setContentDescription(description);move.setEnabled(enabled);move.setAlpha(enabled?1f:.28f);move.setFocusable(true);return move;
     }
-    private void addCategory(String type,EditText category) {
+    private void manageCategories(String initial,java.util.function.BiConsumer<String,String> removed){
+        final String[] type={CategoryStore.kind(initial)};
+        // Only preference settings change while this modal is open; reuse the reference lists.
+        List<Ledger.Entry> records=db.all();PlanningData plan=db.planning();
+        LinearLayout form=column();form.setPadding(dp(18),dp(8),dp(18),dp(8));form.addView(label("↑ ↓로 자주 쓰는 분류를 위에 놓으세요. 순서는 자동 저장되며 기존 기록과 합계는 유지해요.",12,MUTED));space(form,12);
+        LinearLayout tabs=row(),list=column();TextView[] labels=new TextView[Ledger.TYPES.length];ScrollView scroll=new ScrollView(this);scroll.setContentDescription("상세 분류 목록");scroll.addView(list);
+        final Runnable[] refresh={null};refresh[0]=()->{
+            int scrollY=scroll.getScrollY();
+            for(int i=0;i<Ledger.TYPES.length;i++){boolean active=Ledger.TYPES[i].equals(type[0]);labels[i].setTextColor(active?Color.WHITE:COLORS[i]);labels[i].setBackground(bg(active?COLORS[i]:SUBTLE,10));labels[i].setSelected(active);}
+            list.removeAllViews();List<String> choices=categories.choices(type[0],records,plan);
+            if(choices.isEmpty()){space(list,20);list.addView(label("상세 분류가 없어요. 위의 추가 버튼으로 등록하세요.",13,MUTED));}
+            for(int i=0;i<choices.size();i++){
+                String name=choices.get(i),kind=type[0];LinearLayout r=row();r.setTag(name);r.setContentDescription(kind+" "+name+" 상세 분류 "+(i+1)+"번째");r.setPadding(0,dp(4),0,dp(4));
+                TextView title=text(name,14,INK,true);title.setMaxLines(4);title.setEllipsize(TextUtils.TruncateAt.END);title.setTooltipText(name);r.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+                for(int delta:new int[]{-1,1}){final int direction=delta;TextView move=categoryMove(delta<0?"↑":"↓",kind+" "+name+" 상세 분류 "+(delta<0?"위로":"아래로")+" 이동",delta<0?i>0:i<choices.size()-1,()->{try{if(categories.move(kind,name,direction,records,plan))refresh[0].run();}catch(Exception ex){error("순서를 바꾸지 못했어요",message(ex));}});LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(dp(48),dp(48));size.leftMargin=dp(4);r.addView(move,size);}
+                TextView delete=categoryAction("삭제",()->{try{categories.delete(kind,name);if(removed!=null)removed.accept(kind,name);refresh[0].run();}catch(Exception ex){error("상세 분류를 삭제하지 못했어요",message(ex));}});delete.setTextColor(RED);delete.setContentDescription(kind+" "+name+" 상세 분류 삭제");r.addView(delete,new LinearLayout.LayoutParams(dp(54),dp(48)));list.addView(r);
+            }
+            int maxHeight=Math.max(dp(100),Math.min(dp(340),getResources().getDisplayMetrics().heightPixels*40/100));scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(maxHeight,dp(Math.max(120,choices.size()*64)))));
+            scroll.post(()->scroll.scrollTo(0,scrollY));
+        };
+        for(int i=0;i<Ledger.TYPES.length;i++){final int index=i;TextView label=text(Ledger.TYPES[i],14,COLORS[i],true);label.setGravity(Gravity.CENTER);inputTypeLabel(label);label.setContentDescription(Ledger.TYPES[i]+" 상세 분류 관리");labels[i]=label;LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(0,dp(48),1);if(i>0)size.leftMargin=dp(6);tabs.addView(label,size);label.setOnClickListener(v->{type[0]=Ledger.TYPES[index];refresh[0].run();scroll.post(()->scroll.scrollTo(0,0));});}
+        form.addView(tabs);space(form,10);TextView add=button("+ 상세 분류 추가",GREEN,false,()->addCategory(type[0],null,name->{refresh[0].run();scroll.post(()->{for(int i=0;i<list.getChildCount();i++){View item=list.getChildAt(i);if(name.equals(item.getTag())){scroll.smoothScrollTo(0,item.getTop());break;}}});}));add.setContentDescription("관리에서 상세 분류 추가");form.addView(add,new LinearLayout.LayoutParams(-1,dp(48)));space(form,6);form.addView(scroll);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("상세 분류 관리").setView(form).setPositiveButton("닫기",null).setNeutralButton("삭제한 상세 분류 복원",null).create();
+        dialog.setOnShowListener(d->dialog.getButton(-3).setOnClickListener(v->{List<String> deleted=categories.deleted(type[0]);if(deleted.isEmpty()){toast("삭제한 상세 분류가 없어요.");return;}new AlertDialog.Builder(this).setTitle(type[0]+" 상세 분류 복원").setItems(deleted.toArray(new String[0]),(window,index)->{try{categories.remember(type[0],deleted.get(index));refresh[0].run();}catch(Exception ex){error("상세 분류를 복원하지 못했어요",message(ex));}}).setNegativeButton("취소",null).show();}));refresh[0].run();dialog.show();
+    }
+    private void addCategory(String type,EditText category) {addCategory(type,category,null);}
+    private void addCategory(String type,EditText category,java.util.function.Consumer<String> saved) {
         LinearLayout form=column(); form.setPadding(dp(22),dp(12),dp(22),dp(6));
         EditText name=field(form,"상세 분류 이름","",android.text.InputType.TYPE_CLASS_TEXT);
         name.setSingleLine(true); name.setHint("예: 반려동물, 보험, 운동");
@@ -785,10 +810,10 @@ public final class MainActivity extends Activity {
             .setNegativeButton("취소",null).setPositiveButton("추가",null).create();
         dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             try {
-                boolean added=categories.remember(type,name.getText().toString());
-                category.setText(Ledger.cleanCategory(name.getText().toString()));
+                boolean added=categories.remember(type,name.getText().toString(),db.all(),db.planning());
+                String cleaned=Ledger.cleanCategory(name.getText().toString());if(category!=null)category.setText(cleaned);
                 ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(name.getWindowToken(),0);
-                dialog.dismiss(); if(!added) toast("이미 있는 상세 분류를 선택했어요.");
+                dialog.dismiss();if(saved!=null)saved.accept(cleaned);if(!added) toast("이미 있는 상세 분류를 선택했어요.");
             } catch(Exception ex) { name.setError(ex.getMessage()); }
         }));
         dialog.show();
