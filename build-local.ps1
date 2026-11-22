@@ -6,6 +6,7 @@ param(
     [string]$Keystore = "$PSScriptRoot\local-test.keystore"
 )
 $ErrorActionPreference = 'Stop'
+if([string]::IsNullOrWhiteSpace($env:CHAGOK_KEYSTORE_PASSWORD)){throw 'Set CHAGOK_KEYSTORE_PASSWORD in this process before signing; never commit signing secrets.'}
 $taskOriginalJavaHome = $env:JAVA_HOME
 $env:JAVA_HOME = (Resolve-Path -LiteralPath $Jdk).Path
 function Run-Checked([string]$Tool, [string[]]$Arguments) {
@@ -35,9 +36,9 @@ try {
     Run-Checked "$Jdk\bin\jar.exe" @('--update','--file',"$taskBuildOutput\unsigned.apk",'-C',"$taskBuildOutput\dex",'classes.dex')
     Run-Checked "$taskToolsPath\zipalign.exe" @('-f','-p','4',"$taskBuildOutput\unsigned.apk", "$taskBuildOutput\aligned.apk")
     if (!(Test-Path -LiteralPath $Keystore)) {
-        Run-Checked "$Jdk\bin\keytool.exe" @('-genkeypair','-keystore',$Keystore,'-storepass','android','-alias','chagok-local','-keypass','android','-keyalg','RSA','-keysize','2048','-validity','10000','-dname','CN=Chagok Local Test,O=Chagok,C=KR','-storetype','JKS')
+        Run-Checked "$Jdk\bin\keytool.exe" @('-genkeypair','-keystore',$Keystore,'-storepass:env','CHAGOK_KEYSTORE_PASSWORD','-alias','chagok-local','-keypass:env','CHAGOK_KEYSTORE_PASSWORD','-keyalg','RSA','-keysize','2048','-validity','10000','-dname','CN=Chagok Local Test,O=Chagok,C=KR','-storetype','JKS')
     }
-    Run-Checked "$Jdk\bin\java.exe" @('-jar',"$taskToolsPath\lib\apksigner.jar",'sign','--ks',$Keystore,'--ks-pass','pass:android','--key-pass','pass:android','--ks-key-alias','chagok-local','--out',"$taskBuildOutput\chagok-$taskVersionName.apk", "$taskBuildOutput\aligned.apk")
+    Run-Checked "$Jdk\bin\java.exe" @('-jar',"$taskToolsPath\lib\apksigner.jar",'sign','--ks',$Keystore,'--ks-pass','env:CHAGOK_KEYSTORE_PASSWORD','--key-pass','env:CHAGOK_KEYSTORE_PASSWORD','--ks-key-alias','chagok-local','--out',"$taskBuildOutput\chagok-$taskVersionName.apk", "$taskBuildOutput\aligned.apk")
     Run-Checked "$Jdk\bin\java.exe" @('-jar',"$taskToolsPath\lib\apksigner.jar",'verify','--verbose',"$taskBuildOutput\chagok-$taskVersionName.apk")
     Write-Output "APK: $taskBuildOutput\chagok-$taskVersionName.apk"
 } finally { $env:JAVA_HOME = $taskOriginalJavaHome }

@@ -27,6 +27,15 @@ final class CategoryStore {
         return true;
     }
 
+    /** Saves a whole visible order (drag and drop). Ledger records and plans are not touched. */
+    boolean reorder(String type,List<String> ordered,List<Ledger.Entry> entries,PlanningData plan){
+        String kind=kind(type);List<String> before=choices(kind,entries,plan),after=CategoryOrder.reorder(before,ordered);
+        if(before.equals(after))return false;
+        String value=CategoryOrder.encode(after,savedOrder(kind));
+        if(!prefs.edit().putString("order_"+kind,value).commit())throw new IllegalStateException("상세 분류 순서를 저장하지 못했어요. 다시 시도해 주세요.");
+        return true;
+    }
+
     boolean remember(String type,String name) {return remember(type,name,null,null);}
     boolean remember(String type,String name,List<Ledger.Entry> entries,PlanningData plan) {
         String kind=kind(type), cleaned=validate(name);

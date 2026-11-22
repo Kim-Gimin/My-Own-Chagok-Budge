@@ -6,10 +6,21 @@ JDK 17, Android SDK Platform 36, Build Tools 36(aapt2/zipalign/apksigner/D8)이 
 
 아래 경로는 각 PC에 맞게 바꾸세요. 공백/한글 경로를 처리하지 못하는 SDK 도구가 있으면 소스를 짧은 영문 임시 경로로 복사해 빌드하세요.
 
+## 서명 비밀번호
+
+실제 비밀번호를 스크립트·명령 기록·Git·Release에 적지 않습니다. 현재 PowerShell 프로세스에서 안전한 입력으로 설정하세요.
+
+```powershell
+$taskSigningPassword = Read-Host "서명 키 비밀번호" -AsSecureString
+$env:CHAGOK_KEYSTORE_PASSWORD = [Net.NetworkCredential]::new("", $taskSigningPassword).Password
+```
+
+빌드/Android 검사 후 `Remove-Item Env:\CHAGOK_KEYSTORE_PASSWORD`로 프로세스 값을 지울 수 있습니다. 값이 없으면 빌드가 파일 생성 전에 중단됩니다. Gradle도 같은 환경변수를 사용합니다. APK 서명 도구는 환경변수 참조를 받아 실제 값을 명령 인자로 넣지 않습니다.
+
 ## 기존 앱 업데이트용 APK
 
 ```powershell
-.uild-local.ps1 -Jdk 'C:\Tools\jdk-17' `
+.\build-local.ps1 -Jdk 'C:\Tools\jdk-17' `
   -AndroidJar 'C:\Android\platforms\android-36\android.jar' `
   -BuildTools 'C:\Android\build-tools\36.0.0' `
   -Keystore 'C:\PrivateKeys\chagok-original.keystore' `
@@ -25,18 +36,18 @@ Gradle 디버그 구성도 루트의 기존 `local-test.keystore`를 참조합�
 ## JVM 검사
 
 ```powershell
-.	est-core.ps1 -Jdk 'C:\Tools\jdk-17' `
-  -TemplateFile '.\templates\chagok-input-0.8.13.xlsx'
+.\test-core.ps1 -Jdk 'C:\Tools\jdk-17' `
+  -TemplateFile '.\templates\chagok-input-0.8.14.xlsx'
 ```
 
-최신 0.8.11 기준 기존 검사는 1103개입니다. 회계/엑셀 10,000행/기초자산·원금 보호/계획·생활비/분류 정리/계획 XLSX를 검사합니다. 현재 이관 검증의 실제 결과는 [검증 기록](PRIVACY_VALIDATION.md)을 따릅니다.
+0.8.11 당시 기존 검사는 1103개입니다. 회계/엑셀 10,000행/기초자산·원금 보호/계획·생활비/분류 정리/계획 XLSX를 검사합니다. 현재 이관 검증의 실제 결과는 [검증 기록](PRIVACY_VALIDATION.md)을 따릅니다.
 
 ## Android 통합 검사
 
 `test-android.ps1`은 초기화가 가능한 **전용 에뮬레이터만** 사용하세요. 실제 사용자 폰과 실제 장부를 테스트에 사용하지 않습니다. `-Serial emulator-5584`처럼 에뮬레이터 serial을 요구합니다.
 
 ```powershell
-.	est-android.ps1 -Jdk 'C:\Tools\jdk-17' `
+.\test-android.ps1 -Jdk 'C:\Tools\jdk-17' `
   -AndroidJar 'C:\Android\platforms\android-36\android.jar' `
   -BuildTools 'C:\Android\build-tools\36.0.0' `
   -Adb 'C:\Android\platform-tools\adb.exe' `
@@ -55,3 +66,7 @@ Gradle 디버그 구성도 루트의 기존 `local-test.keystore`를 참조합�
 ## 0.8.13 분류 순서 검사
 
 JVM에 CategoryOrderTests를 포함합니다. Android order/orderdark는 추가·중복·빈 이름·유형별 이동·삭제/복원·입력/예산 선택·데이터 보존·손상된 설정 대체를 검사합니다. order 후 에뮬레이터의 앱 프로세스를 종료하고 orderreopen으로 디스크 저장을 확인합니다. orderbefore는0.8.12, 같은 서명0.8.13 업데이트 뒤 orderupgrade로 기존 DB/시각/계획/설정과 기본 순서 보존을 비교합니다.
+
+## 0.8.14 끌기 검사
+
+`test-core.ps1` 기본1,336개, 빈 양식을 함께 주면1,346개입니다. Android order/orderdark/orderreopen와 drag/dragdark를 사용합니다. drag 검사는32개 분류, 실제 입력 경로의 짧은 스크롤/길게 누르기, 양 끝 자동 스크롤, 높이가 다른 긴 이름, CANCEL/대화상자 종료, 저장 횟수, 접근성 노드 동작을 검사합니다. orderbefore는0.8.13에 사용자 순서·숨김·장부·계획·설정을 만들고, 같은 원본 서명0.8.14를 install -r로 올린 후 orderupgrade로 비교합니다. 실제 폰에서 실행하지 마세요.

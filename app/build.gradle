@@ -6,12 +6,12 @@ android {
         applicationId 'kr.chagok.ledger'
         minSdk 26
         targetSdk 36
-        versionCode 27
-        versionName '0.8.13'
+        versionCode 28
+        versionName '0.8.14'
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
     signingConfigs {
-        localTest { storeFile rootProject.file('local-test.keystore'); storePassword 'android'; keyAlias 'chagok-local'; keyPassword 'android' }
+        localTest { storeFile rootProject.file('local-test.keystore'); storePassword System.getenv('CHAGOK_KEYSTORE_PASSWORD'); keyAlias 'chagok-local'; keyPassword System.getenv('CHAGOK_KEYSTORE_PASSWORD') }
     }
     buildTypes { debug { signingConfig signingConfigs.localTest } }
 }

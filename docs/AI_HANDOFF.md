@@ -1,12 +1,22 @@
-# 다른 AI/PC 개발 인계 — 2026-11-21
+# 다른 AI/PC 개발 인계 — 2026-11-23
 
-대상 저장소: https://github.com/Kim-Gimin/My-Own-Chagok-Budge. 최신 앱0.8.13/code27/DB5입니다. 상세 분류 관리의 추가 버튼·유형별 위/아래 순서 설정을 추가했습니다.
+대상 저장소: https://github.com/Kim-Gimin/My-Own-Chagok-Budge. 최신 앱0.8.14/code28/DB5입니다. 상세 분류의 손잡이·이름 길게 누르기·자동 스크롤 끌기 정렬을 지원합니다.
 
 1. `README.md`, `FEATURES.md`, `AGENTS.md`, `VALIDATION.md`, `docs/DATA_SAFETY.md`를 먼저 읽으세요.
 2. `main`에서 새 작업 브랜치를 만들고 요청받은 항목만 한 번에 하나씩 작업하세요. 기존 사용자의 DB/원금/설정과 백업 호환을 보존하세요.
 3. SDK36/JDK17을 준비하고 `docs/BUILD.md`의 JVM 검사와 변경에 맞는 Android 전용 에뮬레이터 검사를 실행하세요. 실제 폰에 test-android 초기화를 실행하지 마세요.
 4. 서명키는 저장소에 없습니다. 기존 앱을 업데이트하려면 소유자가 따로 보관한 원본 키가 필요합니다. 다른 키를 생성해 업데이트 APK라고 배포하지 마세요.
 5. 앱 기능 배포 시 버전/문서/검증/새 빈 양식·APK 해시를 함께 정리하세요. 개인 엑셀이나 복원본을 배포에 넣지 마세요.
+
+## 0.8.14 상세 분류 끌어서 정렬
+
+- ↑ ↓ 버튼(categoryMove)을 없애고 CategoryDrag로 바꿨습니다. 행 왼쪽 44dp ≡ 손잡이는 바로, 이름 영역은 길게 눌러 끌기 시작합니다. 끄는 동안 행은 제자리에 두고 translationY만 바꾸며(터치 대상 행을 removeView하면 CANCEL이 오므로), 놓을 때 CategoryOrder.moveTo → CategoryStore.reorder로 한 번만 저장하고 목록을 다시 그립니다. 목록 끝 56dp에서 자동 스크롤합니다.
+- 이름 TextView의 tooltip은 길게 누르기를 가로채므로 제거했습니다. TalkBack은 행의 사용자 정의 동작 ACTION_MOVE_UP/DOWN(0x7e0c0001/2)으로 한 칸씩 옮깁니다.
+- CategoryStore.reorder는 현재 보이는 목록과 같은 이름 집합일 때만 저장합니다(CategoryOrder.reorder). 저장 형식 COR1·order_유형 키·DB5·백업 형식은 그대로입니다. move(±1)는 호환용으로 유지합니다.
+- JVM: CategoryOrderTests 128개(기존 38 + 이동/검증 90). Android CategoryOrderChecks는 손잡이 터치 이벤트로 실제 끌기(-3/+3/0행)와 접근성 동작을 검사하도록 바꿨습니다. 실제 화면 좌표를 Android 입력 경로에 주입하는 검사로 바꿨고, 긴 이름·32개 분류의 자동 스크롤·취소·접근성 동작을 확인했습니다. 실행 수는 docs/DRAG_REORDER_VALIDATION.md를 따릅니다.
+
+- 끝 위치의 중심이 같은 경우 한 칸 앞에 저장되는 문제와 긴 행의 양 끝 이동을 보정했습니다. 대화상자/행 분리 시 프레임·대기·애니메이션을 취소해 저장하지 않습니다.
+- 원본 키를 유지합니다. 서명 비밀번호는 CHAGOK_KEYSTORE_PASSWORD 환경변수에서만 읽습니다. 키·비밀번호·원본 패치는 저장소와 Release에 넣지 않습니다.
 
 ## 0.8.13 상세 분류 순서
 

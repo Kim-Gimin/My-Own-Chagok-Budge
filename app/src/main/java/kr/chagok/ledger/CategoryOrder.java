@@ -18,6 +18,17 @@ final class CategoryOrder {
         if(index>=0&&index+delta>=0&&index+delta<result.size())Collections.swap(result,index,index+delta);
         return result;
     }
+    /** Moves one visible item to a new slot, as a drag and drop does. */
+    static List<String> moveTo(List<String> visible,int from,int to){
+        if(from<0||from>=visible.size()||to<0||to>=visible.size())throw new IllegalArgumentException("옮길 위치를 찾지 못했어요.");
+        List<String> result=new ArrayList<>(visible);result.add(to,result.remove(from));return result;
+    }
+    /** Accepts a full new order only when it is a permutation of the current visible list. */
+    static List<String> reorder(List<String> visible,List<String> proposed){
+        List<String> current=new ArrayList<>(),next=new ArrayList<>();for(String n:visible)current.add(Ledger.cleanCategory(n));for(String n:proposed)next.add(Ledger.cleanCategory(n));
+        if(current.size()!=next.size()||new HashSet<>(next).size()!=next.size()||!new HashSet<>(current).equals(new HashSet<>(next)))throw new IllegalArgumentException("분류 목록이 바뀌었어요. 다시 시도해 주세요.");
+        return next;
+    }
     static String encode(Collection<String> visible,Collection<String> previous){
         // Retain hidden names for restoration without reviving them in visible choices.
         LinkedHashSet<String> names=new LinkedHashSet<>();

@@ -18,6 +18,14 @@ public final class CategoryOrderTests {
   eq(order,CategoryOrder.move(all,"식비",-1));eq(names("교통","카페","식비"),CategoryOrder.move(all,"식비",1));
   eq(all,CategoryOrder.move(all,"교통",-1));eq(all,CategoryOrder.move(all,"카페",1));eq(all,CategoryOrder.move(all,"없음",1));
   rejects(()->CategoryOrder.move(all,"식비",0));rejects(()->CategoryOrder.move(all,"식비",2));eq(all,names("교통","식비","카페"));
+  // Drag and drop: move one item to any slot without changing the source list.
+  List<String> five=names("가","나","다","라","마");
+  eq(names("라","가","나","다","마"),CategoryOrder.moveTo(five,3,0));eq(names("나","다","라","마","가"),CategoryOrder.moveTo(five,0,4));eq(names("가","다","나","라","마"),CategoryOrder.moveTo(five,1,2));eq(five,CategoryOrder.moveTo(five,2,2));eq(names("가","나","다","라","마"),five);
+  rejects(()->CategoryOrder.moveTo(five,-1,0));rejects(()->CategoryOrder.moveTo(five,0,5));rejects(()->CategoryOrder.moveTo(Collections.emptyList(),0,0));
+  for(int a=0;a<5;a++)for(int b=0;b<5;b++){List<String> moved=CategoryOrder.moveTo(five,a,b);eq(five.get(a),moved.get(b));eq(new HashSet<>(five),new HashSet<>(moved));eq(five,CategoryOrder.moveTo(moved,b,a));}
+  // A dragged order is saved only when it is exactly the current names in a new order.
+  eq(names("카페","교통","식비"),CategoryOrder.reorder(all,names("카페","교통","식비")));eq(order,CategoryOrder.reorder(all,names("\u00a0식비","교통 ","카페")));
+  rejects(()->CategoryOrder.reorder(all,names("식비","교통")));rejects(()->CategoryOrder.reorder(all,names("식비","교통","카페","간식")));rejects(()->CategoryOrder.reorder(all,names("식비","식비","카페")));rejects(()->CategoryOrder.reorder(all,names("식비","교통","간식")));eq(all,names("교통","식비","카페"));
   String encoded=CategoryOrder.encode(order,Collections.emptyList());eq(order,CategoryOrder.decode(encoded));eq(encoded,CategoryOrder.encode(CategoryOrder.decode(encoded),Collections.emptyList()));
   eq(order,CategoryOrder.decode(CategoryOrder.encode(names("\u00a0식비\u3000","교통","식비","카페"),Collections.emptyList())));
   List<String> hidden=CategoryOrder.decode(CategoryOrder.encode(names("식비","교통"),order));eq(order,hidden);eq(names("식비","교통"),CategoryOrder.apply(names("교통","식비"),hidden));eq(order,CategoryOrder.apply(all,hidden));

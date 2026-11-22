@@ -35,12 +35,13 @@
 | 0.8.11 | 25 | 2026-11-19 | 가상 예시·공개 자료 정리, 사용자 데이터 보존 | [v0.8.11](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.11) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.8.11) |
 | 0.8.12 | 26 | 2026-11-20 | [현재·지정 시각, 달력 → 시계, DB5·시간 백업](releases/0.8.12.md) | [v0.8.12](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.12) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.8.12) |
 | 0.8.13 | 27 | 2026-11-21 | [상세 분류 추가·위/아래 순서 변경](releases/0.8.13.md) | [v0.8.13](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.13) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.8.13) |
+| 0.8.14 | 28 | 2026-11-23 | [상세 분류 끌기·자동 스크롤·접근성 정렬](releases/0.8.14.md) | [v0.8.14](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.14) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.8.14) |
 
-**0.1.0부터 0.8.13까지 31개 버전·보관판을 [릴리스 목록](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases)에서 볼 수 있습니다.** 2026-11-22에 과거 소스 보관 릴리스28개를 추가했습니다. 0.6.2의 변형판은 설치 앱의 versionName/code가 같아도 별도 보관 이름으로 구분합니다.
+**0.1.0부터 0.8.14까지 32개 버전·보관판을 [릴리스 목록](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases)에서 볼 수 있습니다.** 2026-11-22에 과거 소스 보관 릴리스28개를 추가했습니다. 0.6.2의 변형판은 설치 앱의 versionName/code가 같아도 별도 보관 이름으로 구분합니다.
 
 0.7.0과 0.8.0은 보관 APK와 대조한 복구 소스이며 각각 새 v0.7.0/v0.8.0 태그를 기존 복구 브랜치와 같은 커밋에 연결했습니다. 원래 소스 ZIP을 새로 발견했다는 뜻은 아닙니다. 기존 태그·소스·0.8.11~0.8.13 릴리스와 첨부 파일은 유지했습니다.
 
-0.8.10 이전 릴리스는 **소스 보관용**으로 Source code ZIP/tar.gz와 변경 내용을 제공합니다. 실제 사례가 포함된 원본 과거 APK·엑셀과 개인 장부·백업·서명키는 첨부하지 않습니다. 설치용 APK는0.8.11 이후 공개 배포물에서 받으세요. 최신 설치 버전은0.8.13으로 유지합니다. [등록 검증](RELEASE_HISTORY_VALIDATION.md)을 함께 확인하세요.
+0.8.10 이전 릴리스는 **소스 보관용**으로 Source code ZIP/tar.gz와 변경 내용을 제공합니다. 실제 사례가 포함된 원본 과거 APK·엑셀과 개인 장부·백업·서명키는 첨부하지 않습니다. 설치용 APK는0.8.11 이후 공개 배포물에서 받으세요. 2026-11-22 목록 정리 당시에는 최신0.8.13을 유지했습니다. 현재 최신 설치 버전은 아래 APK 항목을 확인하세요. [등록 검증](RELEASE_HISTORY_VALIDATION.md)을 함께 확인하세요.
 
 ## 0.7.0·0.8.1 보강 — 2026-11-20
 
@@ -54,4 +55,4 @@
 
 ## 최신 APK
 
-0.8.13 APK와 SHA256, 빈 엑셀 양식은 [v0.8.13 Release](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.8.13)에 첨부합니다. APK를 Git에 직접 넣을 수도 있지만, 이 저장소는 소스와 배포 파일을 분리해 Release로 제공합니다.
+0.8.14 APK와 SHA256, 빈 엑셀 양식은 [v0.8.14 Release](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.8.14)에 첨부합니다. APK를 Git에 직접 넣을 수도 있지만, 이 저장소는 소스와 배포 파일을 분리해 Release로 제공합니다.
