@@ -1,4 +1,10 @@
-# 검증 — 0.9.0 지출 속도
+# 검증 — 0.9.1 예산·전체 지출 그래프
+
+0.9.1 / versionCode30 / DB5. 변경 전 빈 양식 포함 JVM1,358개와 APK 빌드, 변경 후 1,484개(기존1,358 + 예산/전체 비교126)와 원본 서명 빌드를 통과했습니다. APK 인증서가 기존 0.8.14/0.9.0과 같고 패키지·버전 코드도 확인했습니다.
+
+[변경 파일·검사 범위와 한계](docs/DUAL_SPENDING_VALIDATION.md). 연결된 기기와 Android 에뮬레이터가 없어 새 화면을 실제 실행한 검사는 미실시했습니다. 실제 사용자 장부·폰은 사용하지 않았습니다.
+
+## 이전 검증 — 0.9.0 지출 속도
 
 0.9.0 / versionCode29 / DB5. JVM 1,348개 검사, Android debug APK 빌드, versionName/versionCode 확인과 APK v2 서명 검증을 통과했습니다. 세부 결과는 [지출 속도 검증](docs/SPENDING_SPEED_VALIDATION.md)에 기록했습니다.
 

@@ -37,7 +37,7 @@ Gradle 디버그 구성도 루트의 기존 `local-test.keystore`를 참조합�
 
 ```powershell
 .\test-core.ps1 -Jdk 'C:\Tools\jdk-17' `
-  -TemplateFile '.\templates\chagok-input-0.8.14.xlsx'
+  -TemplateFile '.\templates\chagok-input-0.9.1.xlsx'
 ```
 
 0.8.11 당시 기존 검사는 1103개입니다. 회계/엑셀 10,000행/기초자산·원금 보호/계획·생활비/분류 정리/계획 XLSX를 검사합니다. 현재 이관 검증의 실제 결과는 [검증 기록](PRIVACY_VALIDATION.md)을 따릅니다.

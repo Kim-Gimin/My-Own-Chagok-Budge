@@ -3,6 +3,7 @@ package kr.chagok.ledger;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -26,8 +27,21 @@ final class SpendingSpeedData {
     }
     private SpendingSpeedData() {}
 
+    static Result forBudget(List<Ledger.Entry> entries, YearMonth month, LocalDate today,
+                            PlanningData plan, PlanningData.Limit budget) {
+        if (!"지출".equals(budget.type)) throw new IllegalArgumentException("지출 예산을 선택해 주세요.");
+        Set<String> categories=budget.category.isEmpty()
+                ?(plan.hasLivingFilter()?plan.livingCategories():null)
+                :Collections.singleton(budget.category);
+        return build(entries,month,today,budget.amount,categories);
+    }
+
+    static Result totalExpenses(List<Ledger.Entry> entries, YearMonth month, LocalDate today) {
+        return build(entries,month,today,0,null);
+    }
+
     static Result build(List<Ledger.Entry> entries, YearMonth month, LocalDate today,
-                        long budgetTarget, Set<String> livingCategories) {
+                        long budgetTarget, Set<String> expenseCategories) {
         YearMonth previousMonth=month.minusMonths(1);
         boolean currentMonth=month.equals(YearMonth.from(today));
         int daysShown=currentMonth?today.getDayOfMonth():month.lengthOfMonth();
@@ -35,7 +49,7 @@ final class SpendingSpeedData {
         long[] currentByDay=new long[daysShown],previousByDay=new long[daysShown];long previousTotal=0;
         for(Ledger.Entry entry:entries){
             if(!"지출".equals(entry.type))continue;
-            if(livingCategories!=null&&!livingCategories.contains(entry.category))continue;
+            if(expenseCategories!=null&&!expenseCategories.contains(entry.category))continue;
             LocalDate date;try{date=LocalDate.parse(entry.date);}catch(RuntimeException ignored){continue;}
             YearMonth entryMonth=YearMonth.from(date);int day=date.getDayOfMonth();
             if(entryMonth.equals(month)&&day<=daysShown)currentByDay[day-1]+=entry.amount;

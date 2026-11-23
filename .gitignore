@@ -53,3 +53,5 @@ keystore.properties
 
 !templates/chagok-input-0.8.14.xlsx
 *.patch
+
+!templates/chagok-input-0.9.1.xlsx

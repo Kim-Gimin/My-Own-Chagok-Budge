@@ -32,6 +32,7 @@ public final class MainActivity extends Activity {
     private BackupArchive.Snapshot pendingArchive;
     private int planSection,trendMonths=6,guideSection=-1;
     private YearMonth trendSelected;
+    private String trendBudgetCategory="";
     private CategoryStore categories;
     private AppPreferences preferences;
     private Typeface appFont=Typeface.DEFAULT;
@@ -96,7 +97,7 @@ public final class MainActivity extends Activity {
             String exportMonth=state.getString("exportMonth"); if(exportMonth!=null) pendingExportMonth=YearMonth.parse(exportMonth);
             recordsAll=state.getBoolean("recordsAll",true);recordSort=state.getInt("recordSort",recordSort);ArrayList<String> categoryState=state.getStringArrayList("recordCategories");if(categoryState!=null){recordCategories=new HashSet<>();for(String raw:categoryState){String cleaned=Ledger.cleanCategory(raw);recordCategories.add(cleaned.isEmpty()?"기타":cleaned);}}
         }
-        if(state!=null){guideSection=state.getInt("guideSection",-1);planSection=state.getInt("planSection",0);trendMonths=state.getInt("trendMonths",6);String tm=state.getString("trendSelected");if(tm!=null)trendSelected=YearMonth.parse(tm);}
+        if(state!=null){trendBudgetCategory=state.getString("trendBudgetCategory","");guideSection=state.getInt("guideSection",-1);planSection=state.getInt("planSection",0);trendMonths=state.getInt("trendMonths",6);String tm=state.getString("trendSelected");if(tm!=null)trendSelected=YearMonth.parse(tm);}
         if(state!=null&&(continuing||externalActivityPending))calendarMonth=YearMonth.parse(state.getString("calendarMonth",calendarMonth.toString()));
         else {tab=preferences.startTab();resetCalendarToday();}
         if(getIntent().getBooleanExtra("open_backup",false))tab=3;
@@ -105,7 +106,7 @@ public final class MainActivity extends Activity {
         if(Build.VERSION.SDK_INT>=33)unregisterBack=BackApi33.register(this,this::handleBack);
     }
     @Override public void onSaveInstanceState(Bundle out) {
-        out.putInt("guideSection",guideSection);out.putInt("planSection",planSection);out.putInt("trendMonths",trendMonths);if(trendSelected!=null)out.putString("trendSelected",trendSelected.toString());
+        out.putString("trendBudgetCategory",trendBudgetCategory);out.putInt("guideSection",guideSection);out.putInt("planSection",planSection);out.putInt("trendMonths",trendMonths);if(trendSelected!=null)out.putString("trendSelected",trendSelected.toString());
         out.putString("calendarMonth",calendarMonth.toString());out.putBoolean("externalActivityPending",externalActivityPending);
         super.onSaveInstanceState(out); out.putString("month",month.toString()); out.putString("selected",selected.toString());
         out.putInt("tab",tab); out.putInt("statisticsType",statisticsType); out.putInt("filter",filter); out.putString("search",search);
@@ -720,7 +721,7 @@ public final class MainActivity extends Activity {
         if(busy) return;
         if(entry==null){newEntry();return;}
         if(entry.id.startsWith("move:")){String[] parts=entry.id.split(":");SavingsMovement movement=parts.length>1?db.movement(parts[1]):null;if(movement!=null){movementEditor(movement);return;}}
-        
+
         boolean updating=entry!=null;
         LinearLayout form=column(); form.setPadding(dp(22),dp(10),dp(22),dp(15));
         LinearLayout switches=row(); final String[] chosen={updating?entry.type:(tab==2&&statisticsType>=0?Ledger.INPUT_TYPES[statisticsType]:"지출")}; final TextView[] tabs=new TextView[Ledger.INPUT_TYPES.length];
@@ -732,7 +733,7 @@ public final class MainActivity extends Activity {
         EditText date=field(form,"날짜",defaultDate.toString(),android.text.InputType.TYPE_CLASS_TEXT); date.setFocusable(false); date.setContentDescription("날짜 선택");
         TextView clock=recordTimeField(form,date,entry.time);
         amount.setShowSoftInputOnFocus(false);amount.setContentDescription("금액 입력 · 숫자 키패드 열기");amount.setOnClickListener(v->amountKeypad(amount,date.getText().toString()+" "+clock.getText(),chosen[0]));
-        EditText category=field(form,"상세 분류",updating?entry.category:"",android.text.InputType.TYPE_CLASS_TEXT); category.setHint("예: 월급, 식비, 적금, 주식"); category.setSingleLine(true); 
+        EditText category=field(form,"상세 분류",updating?entry.category:"",android.text.InputType.TYPE_CLASS_TEXT); category.setHint("예: 월급, 식비, 적금, 주식"); category.setSingleLine(true);
         LinearLayout categoryActions=row();
         TextView choose=categoryAction("상세 분류 선택",()->chooseCategory(chosen[0],category));
         TextView add=categoryAction("+ 상세 분류 추가",()->addCategory(chosen[0],category));
@@ -809,7 +810,7 @@ public final class MainActivity extends Activity {
         LinearLayout form=column(); form.setPadding(dp(22),dp(12),dp(22),dp(6));
         EditText name=field(form,"상세 분류 이름","",android.text.InputType.TYPE_CLASS_TEXT);
         name.setSingleLine(true); name.setHint("예: 반려동물, 보험, 운동");
-        
+
         TextView note=label(type+" 상세 분류에 저장하고 다음에도 선택할 수 있어요.",12,MUTED); form.addView(note);
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle(type+" 상세 분류 추가").setView(form)
             .setNegativeButton("취소",null).setPositiveButton("추가",null).create();
@@ -965,17 +966,37 @@ public final class MainActivity extends Activity {
     private void pickFavorite(){PlanningData p=db.planning();if(p.favorites.isEmpty()){new AlertDialog.Builder(this).setTitle("자주 쓰는 기록").setMessage("아직 등록된 틀이 없어요. 계획 화면이나 내역 수정 화면에서 추가하세요.").setPositiveButton("틀 추가",(d,w)->favoriteEditor(null)).setNegativeButton("취소",null).show();return;}String[] names=new String[p.favorites.size()];for(int i=0;i<names.length;i++){PlanningData.Favorite f=p.favorites.get(i);names[i]=f.name+" · "+f.type+" · "+won(f.amount);}new AlertDialog.Builder(this).setTitle("자주 쓰는 기록").setItems(names,(d,i)->useFavorite(p.favorites.get(i))).setNegativeButton("취소",null).show();}
     private void favoriteName(Ledger.Entry entry){LinearLayout form=planForm();EditText name=field(form,"틀 이름",entry.category,android.text.InputType.TYPE_CLASS_TEXT);planDialog("자주 쓰는 기록에 저장",form,()->{PlanningData p=db.planning();p.put(new PlanningData.Favorite(UUID.randomUUID().toString(),name.getText().toString(),entry.type,entry.amount,entry.category,entry.memo));db.savePlanning(p);},null);}
     private void favoriteEditor(PlanningData.Favorite old){LinearLayout form=planForm();EditText name=field(form,"틀 이름",old==null?"":old.name,android.text.InputType.TYPE_CLASS_TEXT);Spinner type=spinner(form,"틀 돈의 성격",Ledger.INPUT_TYPES,old==null?"지출":old.type);EditText amount=field(form,"틀 금액 (원)",old==null?"":String.valueOf(old.amount),android.text.InputType.TYPE_CLASS_NUMBER);EditText category=planCategory(form,"틀 상세 분류",old==null?"":old.category,()->type.getSelectedItem().toString(),type,false);EditText memo=field(form,"틀 메모",old==null?"":old.memo,android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);planDialog("자주 쓰는 기록 설정",form,()->{if(Ledger.cleanCategory(category.getText().toString()).isEmpty())throw new IllegalArgumentException("상세 분류를 선택해 주세요.");PlanningData p=db.planning();p.put(new PlanningData.Favorite(old==null?UUID.randomUUID().toString():old.id,name.getText().toString(),type.getSelectedItem().toString(),Ledger.parseAmount(amount.getText().toString()),category.getText().toString(),memo.getText().toString()));db.savePlanning(p);},old==null?null:()->{PlanningData p=db.planning();p.favorites.removeIf(f->f.id.equals(old.id));db.savePlanning(p);});}
+    private void spendingSpeedChart(LinearLayout parent,SpendingSpeedData.Result speed,String scope){
+        float fontRatio=getResources().getDisplayMetrics().scaledDensity/getResources().getDisplayMetrics().density;
+        int chartHeight=dp(270+Math.max(0,fontRatio-1)*90);
+        parent.addView(new SpendingSpeedView(this,scope,speed,COLORS[1],MUTED,INK,MUTED,LINE,appFont),new LinearLayout.LayoutParams(-1,chartHeight));
+        String currentLabel=speed.currentMonth?"이번 달 누적 지출":"선택한 달 누적 지출",previousLabel="전월 같은 기간 지출";
+        valueRow(parent,currentLabel,speed.currentTotal,COLORS[1],15,true,0);valueRow(parent,previousLabel,speed.previousComparableTotal,MUTED,15,true,0);
+        if(speed.budgetTarget>0){long recommended=speed.budgetTarget*speed.daysShown/speed.month.lengthOfMonth();space(parent,6);parent.addView(label((speed.currentMonth?"오늘":"선택 기간")+"까지 권장 지출 "+won(recommended)+" · 총 예산 "+won(speed.budgetTarget),12,MUTED));
+            long budgetDifference=speed.currentTotal-speed.budgetTarget;String budgetText=budgetDifference>0?"예산보다 "+won(budgetDifference)+" 더 썼어요.":budgetDifference<0?"예산까지 "+won(-budgetDifference)+" 남았어요.":"예산을 딱 맞춰 썼어요.";space(parent,8);parent.addView(text(budgetText,14,budgetDifference>0?RED:GREEN,true));}
+        long difference=speed.currentTotal-speed.previousComparableTotal;String comparison=difference>0?"전월 같은 기간보다 "+won(difference)+(speed.currentMonth?" 더 쓰는 중이에요.":" 더 썼어요."):difference<0?"전월 같은 기간보다 "+won(-difference)+(speed.currentMonth?" 덜 쓰는 중이에요.":" 덜 썼어요."):"전월 같은 기간과 같은 금액을 썼어요.";
+        space(parent,7);parent.addView(label(comparison,14,difference>0?RED:GREEN));
+    }
     private void trendPage(){
         monthBar();LinearLayout choices=row();for(int count:new int[]{6,12}){TextView b=button("최근 "+count+"개월",GREEN,trendMonths==count,()->{trendMonths=count;render();});b.setContentDescription("추이 "+count+"개월");choices.addView(b,new LinearLayout.LayoutParams(0,-2,1));}page.addView(choices);space(page,12);
-        PlanningData plan=db.planning();PlanningData.Limit budget=null;for(PlanningData.Limit limit:plan.effective(month,"지출"))if(limit.category.isEmpty()){budget=limit;break;}
-        Set<String> livingCategories=budget!=null&&plan.hasLivingFilter()?plan.livingCategories():null;
-        SpendingSpeedData.Result speed=SpendingSpeedData.build(all,month,LocalDate.now(),budget==null?0:budget.amount,livingCategories);
-        page.addView(text("지출 속도",21,INK,true));space(page,6);page.addView(label((speed.currentMonth?"이번 달과 지난달":"선택한 달과 전월")+"의 누적 지출을 비교해요.",13,MUTED));
-        page.addView(new SpendingSpeedView(this,speed,COLORS[1],MUTED,INK,MUTED,LINE,appFont),new LinearLayout.LayoutParams(-1,dp(250)));
-        if(budget!=null){long recommended=budget.amount*speed.daysShown/speed.month.lengthOfMonth();TextView budgetNote=label((speed.currentMonth?"오늘":"선택 기간")+"까지 권장 지출 "+won(recommended)+" · 총 예산 "+won(budget.amount),12,MUTED);budgetNote.setGravity(Gravity.END);page.addView(budgetNote);}
-        String currentLabel=speed.currentMonth?"이번 달 지출":"선택한 달 지출";String previousLabel=speed.currentMonth?"지난달 같은 기간":"지난달 지출";valueRow(page,currentLabel,speed.currentTotal,COLORS[1],15,true,0);valueRow(page,previousLabel,speed.previousComparableTotal,MUTED,15,true,0);
-        long difference=speed.currentTotal-speed.previousComparableTotal;String comparison=difference>0?previousLabel+"보다 "+won(difference)+(speed.currentMonth?" 더 쓰는 중이에요.":" 더 썼어요."):difference<0?previousLabel+"보다 "+won(-difference)+(speed.currentMonth?" 덜 쓰는 중이에요.":" 덜 썼어요."):previousLabel+"와 같은 금액을 쓰고 있어요.";
-        LinearLayout insight=card(page);insight.setPadding(dp(16),dp(14),dp(16),dp(14));if(budget!=null){long budgetDifference=speed.currentTotal-speed.budgetTarget;String budgetText=budgetDifference>0?"예산보다 "+won(budgetDifference)+" 더 썼어요.":budgetDifference<0?"예산까지 "+won(-budgetDifference)+" 남았어요.":"예산을 딱 맞춰 썼어요.";insight.addView(text("예산  ·  "+budgetText,14,budgetDifference>0?RED:GREEN,true));space(insight,7);}insight.addView(label(comparison,14,difference>0?RED:GREEN));
+        PlanningData plan=db.planning();List<PlanningData.Limit> budgets=plan.effective(month,"지출");LocalDate today=LocalDate.now();
+        page.addView(text("지출 속도",21,INK,true));space(page,6);page.addView(label("예산에 해당하는 지출과 전체 지출을 각각 전월 같은 기간과 비교해요.",13,MUTED));
+        LinearLayout budgetCard=card(page);budgetCard.addView(text("예산 기준 지출",19,INK,true));space(budgetCard,8);
+        if(budgets.isEmpty()){
+            budgetCard.addView(label("이 달에 적용되는 지출 예산이 없어요. 예산을 설정하면 해당 분류의 지출과 예산 속도선을 함께 보여 드려요.",14,MUTED));space(budgetCard,8);
+            budgetCard.addView(button("지출 예산 설정",GREEN,false,()->{planSection=0;navigate(7);}));
+        }else{
+            int selected=0;for(int i=0;i<budgets.size();i++)if(budgets.get(i).category.equals(trendBudgetCategory)){selected=i;break;}
+            PlanningData.Limit budget=budgets.get(selected);trendBudgetCategory=budget.category;
+            String[] names=new String[budgets.size()];for(int i=0;i<names.length;i++)names[i]=budgets.get(i).category.isEmpty()?"전체 지출 예산":budgets.get(i).category+" 예산";
+            if(budgets.size()>1){TextView pick=button("예산 선택 · "+names[selected],GREEN,false,()->new AlertDialog.Builder(this).setTitle("비교할 지출 예산").setItems(names,(d,i)->{trendBudgetCategory=budgets.get(i).category;render();}).setNegativeButton("취소",null).show());pick.setContentDescription("지출 속도 예산 선택");budgetCard.addView(pick);space(budgetCard,8);}
+            else{budgetCard.addView(label(names[selected],14,INK));space(budgetCard,5);}
+            String scope=budget.category.isEmpty()?(plan.hasLivingFilter()?"생활비에 반영한 상세 분류 "+plan.livingCategories().size()+"개를 집계해요.":"전체 지출 분류를 예산에 반영해요."):budget.category+" 분류의 지출을 집계해요.";
+            budgetCard.addView(label(scope,13,MUTED));
+            spendingSpeedChart(budgetCard,SpendingSpeedData.forBudget(all,month,today,plan,budget),"예산 기준 지출");
+        }
+        LinearLayout totalCard=card(page);totalCard.addView(text("전체 지출 비교",19,INK,true));space(totalCard,8);totalCard.addView(label("예산 포함 여부와 관계없이 모든 상세 분류의 지출을 집계해요.",13,MUTED));
+        spendingSpeedChart(totalCard,SpendingSpeedData.totalExpenses(all,month,today),"전체 지출");
         space(page,12);page.addView(label("선택한 달까지 비교해요. 순저축이 회수로 음수이면 막대에서 제외하고 아래 금액에 표시해요. 가로로 밀거나 월 막대를 누르세요.",13,MUTED));space(page,12);
         LinearLayout legend=row();for(int i=0;i<4;i++){TextView t=label("● "+Ledger.TYPES[i],12,COLORS[i]);legend.addView(t,new LinearLayout.LayoutParams(0,dp(36),1));}page.addView(legend);
         List<PlanningData.MonthTotal> months=PlanningData.trend(all,month,trendMonths);if(trendSelected==null||trendSelected.isBefore(months.get(0).month)||trendSelected.isAfter(month))trendSelected=month;

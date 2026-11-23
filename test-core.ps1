@@ -6,6 +6,7 @@ $taskCoreFiles=@("$PSScriptRoot\tests\PlanXlsxTests.java","$PSScriptRoot\tests\C
 $taskCoreFiles+="$PSScriptRoot\tests\LivingBudgetTests.java"
 $taskCoreFiles+="$PSScriptRoot\tests\TimeTests.java"
 $taskCoreFiles+="$PSScriptRoot\tests\CategoryOrderTests.java","$PSScriptRoot\app\src\main\java\kr\chagok\ledger\CategoryOrder.java"
+$taskCoreFiles+="$PSScriptRoot\tests\SpendingSpeedTests.java"
 & "$Jdk\bin\javac.exe" -encoding UTF-8 -d $taskTestOutput $taskCoreFiles
 if($LASTEXITCODE -ne 0){throw 'Test compilation failed'}
 if($TemplateFile){
@@ -45,3 +46,6 @@ if($LASTEXITCODE -ne 0){throw "Transaction time checks failed"}
 
 & "$Jdk\bin\java.exe" -cp $taskTestOutput kr.chagok.ledger.CategoryOrderTests
 if($LASTEXITCODE -ne 0){throw "Category order checks failed"}
+
+& "$Jdk\bin\java.exe" -cp $taskTestOutput kr.chagok.ledger.SpendingSpeedTests
+if($LASTEXITCODE -ne 0){throw "Budget/total expense chart checks failed"}

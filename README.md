@@ -1,6 +1,6 @@
 # 차곡가계부 · My Own Chagok Budget
 
-수입·지출·저축·투자와 월 생활비를 관리하는 오프라인 안드로이드 가계부입니다. **최신 공개 버전은 0.9.0 / versionCode 29 / DB5**이며 Galaxy S23 Ultra를 기준으로 개발했습니다.
+수입·지출·저축·투자와 월 생활비를 관리하는 오프라인 안드로이드 가계부입니다. **최신 공개 버전은 0.9.1 / versionCode 30 / DB5**이며 Galaxy S23 Ultra를 기준으로 개발했습니다.
 
 ## 주요 문서
 
@@ -23,15 +23,15 @@
 | 백업 | 전체 XLSX의 거래·기초자산·계획, 연결 정보까지 보관하는 ZIP |
 | 설정 | 상세 분류 추가·순서 변경·삭제·복원, 다크 모드·글꼴·홈 표시·시작 화면·PIN·설명서·전체 초기화 |
 
-[릴리스 목록](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases)에는 0.1.0부터 총33개 버전·보관판이 있습니다. 0.8.10 이전은 변경 내용과 소스 다운로드를 제공하는 보관용 릴리스이며, 설치 APK는0.8.11 이후 배포물에서 제공합니다. 0.7.0·0.8.0은 복구 소스로 표시합니다.
+[릴리스 목록](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases)에는 0.1.0부터 총34개 버전·보관판이 있습니다. 0.8.10 이전은 변경 내용과 소스 다운로드를 제공하는 보관용 릴리스이며, 설치 APK는0.8.11 이후 배포물에서 제공합니다. 0.7.0·0.8.0은 복구 소스로 표시합니다.
 
 ## 공개 데이터 원칙
 
 **실제 사용자 사례·금액·장부·백업은 공개하지 않습니다.** 설명서, 앱 도움말, 엑셀 예시와 테스트는 가상 데이터만 사용합니다. 과거 소스 태그도 같은 기준으로 정리했습니다. 원본 과거 문서·APK·양식은 공개 자료에서 제외했습니다.
 
-0.9.0은 월별 추이·전월 비교 화면에 누적 지출 속도, 예산 권장 속도선, 전월 같은 기간 비교와 예산 초과·잔액 안내를 추가합니다. 첨부 APK는 기존 0.8.14와 같은 서명 인증서를 사용하며 versionCode가 28에서 29로 올라 기존 앱 위에 설치해 업데이트할 수 있습니다. 앱을 삭제하지 않고 APK를 설치하세요. [서명 대조 결과](docs/SIGNATURE_VALIDATION_0.9.0.md)를 확인할 수 있습니다.
+0.9.1은 월별 추이·전월 비교에 예산 기준 지출과 전체 지출 그래프를 함께 표시합니다. 첫 그래프에서는 적용 중인 전체/분류별 예산을 골라 예산 속도선과 비교하고, 두 번째에서는 모든 지출을 전월과 비교합니다. 기존 앱과 같은 서명으로 업데이트할 수 있으니 앱을 삭제하지 않고 APK를 설치하세요. [검증 범위](docs/DUAL_SPENDING_VALIDATION.md)를 확인할 수 있습니다.
 
-APK는 Git 소스 이력 대신 [GitHub Release](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/latest)에 첨부합니다. 최신 빈 입력 양식은 [chagok-input-0.9.0.xlsx](templates/chagok-input-0.9.0.xlsx)입니다.
+APK는 Git 소스 이력 대신 [GitHub Release](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/latest)에 첨부합니다. 최신 빈 입력 양식은 [chagok-input-0.9.1.xlsx](templates/chagok-input-0.9.1.xlsx)입니다.
 
 ## 개발
 
