@@ -1,4 +1,10 @@
-# 검증 — 0.8.14 상세 분류 끌기 정렬
+# 검증 — 0.9.0 지출 속도
+
+0.9.0 / versionCode29 / DB5. JVM 1,348개 검사, Android debug APK 빌드, versionName/versionCode 확인과 APK v2 서명 검증을 통과했습니다. 세부 결과는 [지출 속도 검증](docs/SPENDING_SPEED_VALIDATION.md)에 기록했습니다.
+
+실제 사용자 폰과 실제 장부는 사용하지 않았습니다.
+
+## 이전 검증 — 0.8.14 상세 분류 끌기 정렬
 
 0.8.14 / versionCode28 / DB5. 변경 전0.8.13 JVM1,256개·빌드, 변경 후 JVM 기본1,336개(빈 양식 포함1,346개)와 원본 서명 빌드를 통과했습니다.
 
