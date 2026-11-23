@@ -140,6 +140,20 @@ public final class CoreTests {
         eq(1,read(fixture(signedHeaders()+signedRow("투자","-100").replace("<is><t>-100</t></is>","<f>-50*2</f><v>-100</v>"),false,null)).invalidRows);
         rejects(()->read(fixture(signedHeaders().replace(s("F1","계좌"),s("F1","메모"))+signedRow("수입","100"),false,null)));
     }
+    private static void spendingSpeedChecks()throws Exception{
+        List<Ledger.Entry> entries=Arrays.asList(
+                new Ledger.Entry("c1","2026-11-01","지출",100,"식비","",0),
+                new Ledger.Entry("c2","2026-11-03","지출",50,"교통","",0),
+                new Ledger.Entry("p1","2026-10-01","지출",70,"식비","",0),
+                new Ledger.Entry("p2","2026-10-03","지출",30,"교통","",0),
+                new Ledger.Entry("p3","2026-10-04","지출",40,"식비","",0),
+                new Ledger.Entry("i","2026-11-02","수입",999,"월급","",0));
+        SpendingSpeedData.Result result=SpendingSpeedData.build(entries,YearMonth.of(2026,11),LocalDate.of(2026,11,3),1900,null);
+        eq(true,result.currentMonth);eq(3,result.daysShown);eq(150L,result.currentTotal);eq(100L,result.previousComparableTotal);eq(140L,result.previousTotal);eq(1900L,result.budgetTarget);
+        eq(Arrays.asList(100L,100L,150L),result.current);eq(Arrays.asList(70L,70L,100L),result.previous);
+        result=SpendingSpeedData.build(entries,YearMonth.of(2026,10),LocalDate.of(2026,11,3),0,new HashSet<>(Collections.singletonList("식비")));
+        eq(false,result.currentMonth);eq(31,result.daysShown);eq(110L,result.currentTotal);eq(0L,result.previousComparableTotal);
+    }
     private static void historyChecks()throws Exception{
         List<Ledger.Entry> entries=Arrays.asList(new Ledger.Entry("a","2025-12-31","수입",1000,"급여","급여 입금",0),new Ledger.Entry("b","2026-01-01","지출",100,"식비","점심 커피",0),new Ledger.Entry("c","2026-01-01","저축",200,"적금","매월 저축",0),new Ledger.Entry("d","2026-02-01","지출",50,"교통","BUS 교통비",0),new Ledger.Entry("e","2026-02-02","지출",70,"식비","",0));
         HistoryData.Result data=HistoryData.build(entries,null,"","",Collections.emptySet(),0);eq(5,data.entries.size());eq(580L,Ledger.available(data.totals));eq(3,data.months.size());eq(YearMonth.of(2026,2),data.months.get(0).month);eq(-120L,Ledger.available(data.months.get(0).totals));eq(-300L,Ledger.available(data.months.get(1).days.get(0).totals));eq("e",data.entries.get(0).id);
@@ -187,6 +201,7 @@ public final class CoreTests {
         eq(true,IconGeometry.GEAR_HOLE>1.5f&&IconGeometry.GEAR_HOLE+0.9f<IconGeometry.GEAR_ROOT-0.9f);
     }
     public static void main(String[] args)throws Exception {
+        spendingSpeedChecks();
         historyActionsChecks();
         comparisonChecks();
         typeAndExportChecks();

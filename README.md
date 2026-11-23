@@ -1,6 +1,6 @@
 # 차곡가계부 · My Own Chagok Budget
 
-수입·지출·저축·투자와 월 생활비를 관리하는 오프라인 안드로이드 가계부입니다. **최신 공개 버전은 0.8.14 / versionCode 28 / DB5**이며 Galaxy S23 Ultra를 기준으로 개발했습니다.
+수입·지출·저축·투자와 월 생활비를 관리하는 오프라인 안드로이드 가계부입니다. **최신 공개 버전은 0.9.0 / versionCode 29 / DB5**이며 Galaxy S23 Ultra를 기준으로 개발했습니다.
 
 ## 주요 문서
 
@@ -29,9 +29,9 @@
 
 **실제 사용자 사례·금액·장부·백업은 공개하지 않습니다.** 설명서, 앱 도움말, 엑셀 예시와 테스트는 가상 데이터만 사용합니다. 과거 소스 태그도 같은 기준으로 정리했습니다. 원본 과거 문서·APK·양식은 공개 자료에서 제외했습니다.
 
-0.8.14는 상세 분류의 ≡ 손잡이를 끌거나 이름을 길게 눌러 순서를 바꿀 수 있습니다. 목록 끝 자동 스크롤과 접근성 위·아래 이동 동작을 지원합니다. 기록·예산·반복·즐겨찾기의 선택 목록에 저장한 순서를 적용합니다. DB5·거래·시각·계획·기존 설정은 유지합니다. 기존 앱을 삭제하지 말고 같은 서명의 새 APK로 업데이트하세요.
+0.9.0은 월별 추이·전월 비교 화면에 누적 지출 속도, 예산 권장 속도선, 전월 같은 기간 비교와 예산 초과·잔액 안내를 추가합니다. 기존 앱을 삭제하지 말고 같은 서명의 새 APK로 업데이트하세요.
 
-APK는 Git 소스 이력 대신 [GitHub Release](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/latest)에 첨부합니다. 최신 빈 입력 양식은 [chagok-input-0.8.14.xlsx](templates/chagok-input-0.8.14.xlsx)입니다.
+APK는 Git 소스 이력 대신 [GitHub Release](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/latest)에 첨부합니다. 최신 빈 입력 양식은 [chagok-input-0.9.0.xlsx](templates/chagok-input-0.9.0.xlsx)입니다.
 
 ## 개발
 

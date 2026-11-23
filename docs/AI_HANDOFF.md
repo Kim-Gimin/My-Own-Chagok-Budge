@@ -1,6 +1,6 @@
 # 다른 AI/PC 개발 인계 — 2026-11-23
 
-대상 저장소: https://github.com/Kim-Gimin/My-Own-Chagok-Budge. 최신 앱0.8.14/code28/DB5입니다. 상세 분류의 손잡이·이름 길게 누르기·자동 스크롤 끌기 정렬을 지원합니다.
+대상 저장소: https://github.com/Kim-Gimin/My-Own-Chagok-Budge. 최신 앱0.9.0/code29/DB5입니다. 지출 속도·예산 권장 속도선·전월 같은 기간 비교와 상세 분류 끌기 정렬을 지원합니다.
 
 1. `README.md`, `FEATURES.md`, `AGENTS.md`, `VALIDATION.md`, `docs/DATA_SAFETY.md`를 먼저 읽으세요.
 2. `main`에서 새 작업 브랜치를 만들고 요청받은 항목만 한 번에 하나씩 작업하세요. 기존 사용자의 DB/원금/설정과 백업 호환을 보존하세요.
