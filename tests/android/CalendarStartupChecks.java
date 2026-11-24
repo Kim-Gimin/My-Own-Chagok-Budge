@@ -40,7 +40,7 @@ final class CalendarStartupChecks {
   t.eq(past,UserGuideChecks.get(app,"calendarMonth"));t.eq(march,prefs.statisticsMonth());t.eq(true,t.findDesc(app.getWindow().getDecorView(),"2024-02-29 날짜 선택").isSelected());
   // Check month/year edges against the displayed calendar, not the separate statistics month.
   call(t,app,"recordSavedDate",new Class[]{LocalDate.class},LocalDate.of(2026,12,31));call(t,app,"moveMonth",new Class[]{int.class},1);t.eq(YearMonth.of(2027,1),UserGuideChecks.get(app,"calendarMonth"));
-  for(int root:new int[]{0,1,2,3,4,5,7,8}){nav(t,app,root);StartupChecks.reopen(t);t.eq(5,UserGuideChecks.get(app,"tab"));nav(t,app,0);t.eq(todayMonth,UserGuideChecks.get(app,"calendarMonth"));t.eq(today,UserGuideChecks.get(app,"selected"));}
+  for(int root:new int[]{0,1,2,3,4,5,7,8}){nav(t,app,root);Object calendarMonth=UserGuideChecks.get(app,"calendarMonth"),selectedDay=UserGuideChecks.get(app,"selected");StartupChecks.reopen(t);t.eq(root,UserGuideChecks.get(app,"tab"));t.eq(calendarMonth,UserGuideChecks.get(app,"calendarMonth"));t.eq(selectedDay,UserGuideChecks.get(app,"selected"));nav(t,app,5);nav(t,app,0);t.eq(todayMonth,UserGuideChecks.get(app,"calendarMonth"));t.eq(today,UserGuideChecks.get(app,"selected"));}
   nav(t,app,3);call(t,app,"chooseImport",new Class[]{});Thread.sleep(500);BackNavigationChecks.back(t);t.eq(3,UserGuideChecks.get(app,"tab"));
   nav(t,app,0);t.eq(todayMonth,UserGuideChecks.get(app,"calendarMonth"));t.screenshot(ctx,"calendar-current-month");
   StartupChecks.close(t,app);app=StartupChecks.start(t,false);t.eq(5,UserGuideChecks.get(app,"tab"));t.eq(march,prefs.statisticsMonth());t.eq(original,StartupChecks.financial(t));t.screenshot(ctx,"calendar-start-home");StartupChecks.close(t,app);

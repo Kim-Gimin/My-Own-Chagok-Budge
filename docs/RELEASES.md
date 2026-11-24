@@ -4,6 +4,7 @@
 
 | 버전 | code | 배포일 | 변경 | 공개 소스 | 릴리스 |
 |---|---:|---|---|---|---|
+| 0.9.2 | 31 | 2026-11-24 | [다른 앱 복귀 시 화면·입력 유지](releases/0.9.2.md) | [v0.9.2](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.9.2) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.2) |
 | 0.9.1 | 30 | 2026-11-23 | [예산 기준·전체 지출 그래프 동시 비교](releases/0.9.1.md) | [v0.9.1](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.9.1) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.1) |
 | 0.9.0 | 29 | 2026-11-23 | [지출 속도·예산 권장 속도선·전월 같은 기간 비교](releases/0.9.0.md) | [v0.9.0](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.9.0) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.0) |
 | 0.8.14 | 28 | 2026-11-23 | [상세 분류 끌기·자동 스크롤·접근성 정렬](releases/0.8.14.md) | [v0.8.14](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.8.14) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.8.14) |
@@ -39,19 +40,23 @@
 | 0.1.1 | 2 | 2026-10-27 | 상세 분류 선택·추가 | [v0.1.1](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.1.1) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.1.1) |
 | 0.1.0 | 1 | 2026-10-27 | 수입·지출·저축, 달력·내역·통계, 엑셀 | [v0.1.0](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.1.0) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.1.0) |
 
-## 현재 배포 — 2026-11-23
+## 현재 배포 — 2026-11-24
 
-**최신 버전은 0.9.1 / versionCode30 / DB5**입니다. 0.1.0부터 총34개 버전·보관판이 등록되어 있으며 위 표는 최신 버전부터 정렬합니다.
+**최신 버전은 0.9.2 / versionCode31 / DB5**입니다. 0.1.0부터 총35개 버전·보관판이 등록되어 있으며 위 표는 최신 버전부터 정렬합니다.
 
-- [0.9.1 APK 다운로드](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.1/chagok-0.9.1.apk)
-- [빈 엑셀 입력 양식](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.1/chagok-input-0.9.1.xlsx) · [공개 소스 ZIP](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.1/chagok-source-0.9.1.zip)
-- [파일 SHA256](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.1/SHA256SUMS.txt) · [전체 배포 파일](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.1)
+- [0.9.2 APK 다운로드](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.2/chagok-0.9.2.apk)
+- [빈 엑셀 입력 양식](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.2/chagok-input-0.9.2.xlsx) · [공개 소스 ZIP](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.2/chagok-source-0.9.2.zip)
+- [파일 SHA256](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.2/SHA256SUMS.txt) · [전체 배포 파일](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.2)
 
-기존 0.8.14/0.9.0과 같은 서명 인증서를 사용합니다. 앱을 삭제하지 않고 APK를 설치해 업데이트하세요. 거래·계획·DB5·기존 백업 형식은 유지하며, 빈 입력 양식은0.9.0과 내용이 같습니다.
+기존 0.8.14/0.9.0/0.9.1과 같은 서명 인증서를 사용합니다. 앱을 삭제하지 않고 APK를 설치해 업데이트하세요. 거래·계획·DB5·기존 백업 형식은 유지하며, 빈 입력 양식은0.9.1과 내용이 같습니다.
 
-검증은 빈 양식 포함 JVM1,484개와 APK 빌드·v2/v3 서명·패키지/버전 확인을 통과했습니다. 새 화면의 실제 기기·에뮬레이터 실행 검사는 미실시했습니다. [변경 파일·검증 범위와 한계](DUAL_SPENDING_VALIDATION.md)를 확인하세요.
+검증은 빈 양식 포함 JVM1,484개와 APK 빌드·v2/v3 서명·패키지/버전 확인을 통과했습니다. Android 복귀 회귀 검사 소스도 컴파일했으며 실제 기기·에뮬레이터 실행은 미실시했습니다. [변경 파일·검증 범위와 한계](BACKGROUND_RESUME_VALIDATION.md)를 확인하세요.
 
 ## 최근 버전의 변경 내용
+
+### 0.9.2 — 다른 앱 복귀 시 보던 화면 유지
+
+카드 내역 확인 등으로 다른 앱에 잠시 갔다 돌아오면 보던 화면·달·필터·스크롤과 살아 있는 입력창을 유지합니다. PIN 확인 뒤에도 작업을 이어가고 저장된 화면 상태가 있으면 Activity 재생성 시 복원합니다. 완전 종료 후 새 실행은 기본 홈이며 사용자 시작 화면 설정을 우선합니다. 프로세스 종료 뒤 저장하지 않은 대화상자 초안을 복원하는 기능은 아닙니다. [0.9.2 상세 안내](releases/0.9.2.md).
 
 ### 0.9.1 — 예산 기준·전체 지출 동시 비교
 
@@ -95,6 +100,6 @@
 
 ### 과거 릴리스 등록 — 2026-11-22 당시 기록
 
-과거 소스 보관 릴리스28개를 추가해 **당시 총31개, 최신0.8.13**이었습니다. 이 수치는 그날 작업 결과입니다. 이후0.8.14·0.9.0·0.9.1이 추가되어 **현재는 총34개, 최신0.9.1**입니다. [당시 등록 검증](RELEASE_HISTORY_VALIDATION.md)을 참조하세요.
+과거 소스 보관 릴리스28개를 추가해 **당시 총31개, 최신0.8.13**이었습니다. 이 수치는 그날 작업 결과입니다. 이후0.8.14·0.9.0·0.9.1·0.9.2가 추가되어 **현재는 총35개, 최신0.9.2**입니다. [당시 등록 검증](RELEASE_HISTORY_VALIDATION.md)을 참조하세요.
 
 0.8.10 이전 릴리스는 소스 보관용이며 GitHub Source code ZIP/tar.gz와 변경 내용을 제공합니다. 설치용 APK는0.8.11 이후 공개 배포물에서 받을 수 있습니다. 0.6.2 변형판은 설치 앱의 versionName/code가 같아도 보관 이름으로 구분합니다. 실제 사례가 포함된 과거 원본 APK·엑셀, 개인 장부·백업·서명키는 공개하지 않습니다.

@@ -37,7 +37,8 @@ public final class MainActivity extends Activity {
     private AppPreferences preferences;
     private Typeface appFont=Typeface.DEFAULT;
     private boolean unlocked;
-    private boolean stopped,paused,returnHomeOnResume,externalActivityPending;
+    private boolean stopped,externalActivityPending,renderAfterUnlock;
+    private int restoredPageScrollY=-1;
     private Dialog lockDialog,exitDialog;
     private Runnable unregisterBack,unregisterExitBack;
     private XlsxIO.ReadResult pendingRead;
@@ -83,7 +84,7 @@ public final class MainActivity extends Activity {
         statisticsMode=preferences.statisticsMode();statisticsYear=preferences.statisticsYear();month=preferences.statisticsMonth();statisticsFrom=preferences.statisticsDate(true);statisticsTo=preferences.statisticsDate(false);
         if(statisticsFrom.isAfter(statisticsTo)){statisticsFrom=LocalDate.now().withDayOfMonth(1);statisticsTo=LocalDate.now();}
         recordSort=preferences.recordSort();
-        boolean continuing=getLastNonConfigurationInstance()!=null;
+        boolean restoringScreen=state!=null&&state.containsKey("statisticsType");
         externalActivityPending=state!=null&&state.getBoolean("externalActivityPending",false);
         if(state!=null) {
             month=YearMonth.parse(state.getString("month",month.toString()));
@@ -98,14 +99,14 @@ public final class MainActivity extends Activity {
             recordsAll=state.getBoolean("recordsAll",true);recordSort=state.getInt("recordSort",recordSort);ArrayList<String> categoryState=state.getStringArrayList("recordCategories");if(categoryState!=null){recordCategories=new HashSet<>();for(String raw:categoryState){String cleaned=Ledger.cleanCategory(raw);recordCategories.add(cleaned.isEmpty()?"기타":cleaned);}}
         }
         if(state!=null){trendBudgetCategory=state.getString("trendBudgetCategory","");guideSection=state.getInt("guideSection",-1);planSection=state.getInt("planSection",0);trendMonths=state.getInt("trendMonths",6);String tm=state.getString("trendSelected");if(tm!=null)trendSelected=YearMonth.parse(tm);}
-        if(state!=null&&(continuing||externalActivityPending))calendarMonth=YearMonth.parse(state.getString("calendarMonth",calendarMonth.toString()));
+        if(restoringScreen){calendarMonth=YearMonth.parse(state.getString("calendarMonth",calendarMonth.toString()));restoredPageScrollY=Math.max(0,state.getInt("pageScrollY",0));displayLimit=Math.max(100,state.getInt("displayLimit",100));}
         else {tab=preferences.startTab();resetCalendarToday();}
-        if(getIntent().getBooleanExtra("open_backup",false))tab=3;
-        if(tab==6||tab==9)tab=5;
+        if(!restoringScreen&&getIntent().getBooleanExtra("open_backup",false))tab=3;
         render();
         if(Build.VERSION.SDK_INT>=33)unregisterBack=BackApi33.register(this,this::handleBack);
     }
     @Override public void onSaveInstanceState(Bundle out) {
+        out.putInt("pageScrollY",pageScroll!=null?pageScroll.getScrollY():Math.max(0,restoredPageScrollY));out.putInt("displayLimit",displayLimit);
         out.putString("trendBudgetCategory",trendBudgetCategory);out.putInt("guideSection",guideSection);out.putInt("planSection",planSection);out.putInt("trendMonths",trendMonths);if(trendSelected!=null)out.putString("trendSelected",trendSelected.toString());
         out.putString("calendarMonth",calendarMonth.toString());out.putBoolean("externalActivityPending",externalActivityPending);
         super.onSaveInstanceState(out); out.putString("month",month.toString()); out.putString("selected",selected.toString());
@@ -116,15 +117,16 @@ public final class MainActivity extends Activity {
         if(pendingExportMonth!=null) out.putString("exportMonth",pendingExportMonth.toString());
         out.putBoolean("recordsAll",recordsAll);out.putInt("recordSort",recordSort);out.putStringArrayList("recordCategories",new ArrayList<>(recordCategories));
     }
-    // Retain browsing across configuration changes, but never treat process restoration as a new browsing session.
-    @Override public Object onRetainNonConfigurationInstance(){return Boolean.TRUE;}
-    @Override public void onUserLeaveHint(){super.onUserLeaveHint();if(!externalActivityPending)returnHomeOnResume=true;}
     @Override public void startActivityForResult(Intent intent,int requestCode,Bundle options){
         externalActivityPending=true;
         try{super.startActivityForResult(intent,requestCode,options);}catch(RuntimeException ex){externalActivityPending=false;throw ex;}
     }
-    @Override public void onPause(){paused=true;dismissExitDialog();super.onPause();}
-    @Override public void onResume(){super.onResume();if(categoryCleanupFailed)return;boolean reopenHome=!busy&&((returnHomeOnResume&&!externalActivityPending)||((stopped||paused)&&(tab==6||tab==9)));stopped=false;paused=false;returnHomeOnResume=false;externalActivityPending=false;if(reopenHome){tab=5;resetCalendarToday();}if(preferences!=null && preferences.hasPin() && !unlocked)render();else if(reopenHome)render();else if(tab==2&&statisticsMode==StatisticsPeriod.YTD&&!LocalDate.now().equals(renderedStatisticsToday))render();else if(tab==1&&historyRail!=null){historyActions.endScroll();updateHistoryActions(false);}}
+    @Override public void onPause(){dismissExitDialog();super.onPause();}
+    @Override public void onResume(){super.onResume();if(categoryCleanupFailed)return;stopped=false;externalActivityPending=false;if(preferences!=null&&preferences.hasPin()&&!unlocked)renderLock();else if(root==null)render();else resumeVisibleScreen();}
+    private void resumeVisibleScreen(){
+        if(tab==2&&statisticsMode==StatisticsPeriod.YTD&&!LocalDate.now().equals(renderedStatisticsToday)){restoredPageScrollY=pageScroll==null?0:pageScroll.getScrollY();render();}
+        else if(tab==1&&historyRail!=null){historyActions.endScroll();updateHistoryActions(false);}
+    }
     @Override public void onStop(){stopped=true;dismissExitDialog();if(historyRail!=null&&revealHistoryRail!=null)historyRail.removeCallbacks(revealHistoryRail);if(preferences!=null && preferences.hasPin() && !isChangingConfigurations())unlocked=false;super.onStop();}
     @Override public void onBackPressed(){handleBack();}
     private void handleBack(){
@@ -209,7 +211,8 @@ public final class MainActivity extends Activity {
     }
     private void render() {
         if(isFinishing() || isDestroyed()) return;
-        if(preferences.hasPin() && !unlocked){renderLock();return;}
+        if(preferences.hasPin() && !unlocked){renderAfterUnlock=true;renderLock();return;}
+        renderAfterUnlock=false;
         clearHistoryActions();
         all=db.all(); monthly=Ledger.month(all,viewMonth());
         boolean stats=tab==2;int surface=stats&&!preferences.dark()?SURFACE:BG;
@@ -242,6 +245,7 @@ public final class MainActivity extends Activity {
         page=tab==0?new MonthSwipeLayout(this,delta->moveMonth(delta)):column(); page.setPadding(dp(stats||tab==1?16:20),dp(stats?0:6),dp(stats||tab==1?16:20),dp(tab==0?88:32)); scroll.addView(page);
         if(tab==0)monthBar();
         if(tab==0) calendar(); else if(tab==1) records(); else if(tab==2) statistics(); else if(tab==3)files();else if(tab==4)settlements();else if(tab==5)home();else if(tab==7)planningPage();else if(tab==8)trendPage();else if(tab==9)new UserGuidePage(this,SURFACE,INK,MUTED,GREEN,appFont).populate(page,pageScroll,guideSection,value->guideSection=value);else settings();
+        if(restoredPageScrollY>=0){final int y=restoredPageScrollY;restoredPageScrollY=-1;scroll.post(()->{if(pageScroll==scroll)scroll.scrollTo(0,y);});}
         TextView add=text("+",stats?24:26,stats?PINK:Color.WHITE,false); add.setGravity(Gravity.CENTER); add.setContentDescription("수입, 지출, 저축, 투자, 저축회수 기록 추가"); add.setBackground(bg(stats?(preferences.dark()?SUBTLE:0xFFFDECF2):GREEN,14));
         LinearLayout.LayoutParams addParams=new LinearLayout.LayoutParams(dp(stats?32:42),dp(stats?32:42)); addParams.leftMargin=dp(9); if(tab==2 || tab==4) header.addView(add,addParams);add.setOnClickListener(v->edit(null));
         if(tab==6||tab==9)header.addView(new View(this),headerIconParams());else header.addView(settingsShortcut(),headerIconParams());
@@ -362,7 +366,7 @@ public final class MainActivity extends Activity {
         if(lockDialog!=null&&lockDialog.isShowing())return;
         LinearLayout form=column();form.setGravity(Gravity.CENTER);form.setPadding(dp(30),dp(50),dp(30),dp(30));form.setBackgroundColor(BG);form.addView(text("차곡가계부 잠금",24,INK,true));space(form,22);EditText pin=pinField(form,"비밀번호");pin.setContentDescription("잠금 비밀번호");TextView hint=label("숫자 비밀번호를 입력해 주세요.",13,MUTED);form.addView(hint);space(form,18);TextView unlock=button("잠금 해제",GREEN,true,()->{});form.addView(unlock,new LinearLayout.LayoutParams(-1,dp(50)));space(form,12);form.addView(button("앱 닫기",MUTED,false,()->finish()));
         Dialog gate=new Dialog(this);lockDialog=gate;gate.setCancelable(false);gate.setContentView(form);gate.getWindow().setBackgroundDrawableResource(android.R.color.transparent);gate.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);gate.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);gate.show();gate.getWindow().setLayout(-1,-1);
-        unlock.setOnClickListener(v->{if(preferences.blockedSeconds()>0){hint.setText(preferences.blockedSeconds()+"초 후 다시 시도하세요.");return;}String candidate=pin.getText().toString();unlock.setEnabled(false);io.execute(()->{boolean ok=preferences.checkPin(candidate);runOnUiThread(()->{if(isFinishing()||isDestroyed())return;unlock.setEnabled(true);if(ok&&!stopped){unlocked=true;((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(pin.getWindowToken(),0);gate.dismiss();lockDialog=null;render();if(pendingIntent!=null){Intent result=pendingIntent;pendingIntent=null;onActivityResult(pendingRequest,pendingResult,result);}else if(pendingArchive!=null){BackupArchive.Snapshot archive=pendingArchive;pendingArchive=null;previewArchive(archive);}else if(pendingRead!=null){XlsxIO.ReadResult read=pendingRead;Ledger.ImportPlan plan=pendingPlan;pendingRead=null;pendingPlan=null;preview(read,plan);}else if(pendingError!=null){String message=pendingError,title=pendingErrorTitle;pendingError=null;pendingErrorTitle=null;error(title,message);}}else{pin.setText("");hint.setText(preferences.blockedSeconds()>0?preferences.blockedSeconds()+"초 후 다시 시도하세요.":"비밀번호가 맞지 않아요.");}});});});
+        unlock.setOnClickListener(v->{if(preferences.blockedSeconds()>0){hint.setText(preferences.blockedSeconds()+"초 후 다시 시도하세요.");return;}String candidate=pin.getText().toString();unlock.setEnabled(false);io.execute(()->{boolean ok=preferences.checkPin(candidate);runOnUiThread(()->{if(isFinishing()||isDestroyed())return;unlock.setEnabled(true);if(ok&&!stopped){unlocked=true;((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(pin.getWindowToken(),0);gate.dismiss();lockDialog=null;if(root==null||renderAfterUnlock)render();else resumeVisibleScreen();if(pendingIntent!=null){Intent result=pendingIntent;pendingIntent=null;onActivityResult(pendingRequest,pendingResult,result);}else if(pendingArchive!=null){BackupArchive.Snapshot archive=pendingArchive;pendingArchive=null;previewArchive(archive);}else if(pendingRead!=null){XlsxIO.ReadResult read=pendingRead;Ledger.ImportPlan plan=pendingPlan;pendingRead=null;pendingPlan=null;preview(read,plan);}else if(pendingError!=null){String message=pendingError,title=pendingErrorTitle;pendingError=null;pendingErrorTitle=null;error(title,message);}}else{pin.setText("");hint.setText(preferences.blockedSeconds()>0?preferences.blockedSeconds()+"초 후 다시 시도하세요.":"비밀번호가 맞지 않아요.");}});});});
     }
     private void hideKeyboard() { View focus=getCurrentFocus(); if(focus!=null) ((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(focus.getWindowToken(),0); }
     private TextView monthArrow(String glyph,String description,Runnable click){
