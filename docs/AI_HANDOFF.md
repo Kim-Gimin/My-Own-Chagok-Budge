@@ -1,6 +1,6 @@
 # 다른 AI/PC 개발 인계 — 2026-11-24
 
-대상 저장소: https://github.com/Kim-Gimin/My-Own-Chagok-Budge. 최신 앱0.9.2/code31/DB5입니다. 예산 기준·전체 지출 그래프 동시 비교와 상세 분류 끌기 정렬을 지원합니다.
+대상 저장소: https://github.com/Kim-Gimin/My-Own-Chagok-Budge. 소스 최신 앱1.0.0/code32/DB5(하단 메뉴 편집)입니다. 1.0.0 APK·Release는 아직 게시 전이며 게시된 최신은0.9.2입니다. 예산 기준·전체 지출 그래프 동시 비교와 상세 분류 끌기 정렬을 지원합니다.
 
 1. `README.md`, `FEATURES.md`, `AGENTS.md`, `VALIDATION.md`, `docs/DATA_SAFETY.md`를 먼저 읽으세요.
 2. `main`에서 새 작업 브랜치를 만들고 요청받은 항목만 한 번에 하나씩 작업하세요. 기존 사용자의 DB/원금/설정과 백업 호환을 보존하세요.
@@ -11,6 +11,14 @@
 ## 2026-11-24 실제 릴리스 순서 정정
 
 사용자 승인으로 v0.7.0/v0.8.0 주석 태그의 정렬 날짜를 과거 이관 태그와 같은 날짜로 맞췄습니다. 태그 객체 SHA는 변경됐지만 소스 커밋·35개 릴리스 ID/본문/공개 시각·첨부 파일·최신0.9.2는 유지했습니다. RELEASE_ORDER_VALIDATION.md의 전후 SHA와 기존 클론의 두 태그만 다시 받는 명령을 확인하세요. 실제 GitHub 화면의 순서도 확인했습니다. 이 두 태그에만 승인된 예외이며 다른 태그를 임의로 다시 쓰지 않습니다.
+
+## 1.0.0 하단 메뉴 편집
+
+- 새 `BottomNav`(순수 Java): 후보10개(화면 4/2/5/0/1/3/7/8, 대화상자 기초자산-2·해지배분-1), 기본6개=0.9.2 하단, 3~6개·중복 금지, `BNV1:` 코덱, 손상 시 기본. 설정6·설명서9는 후보가 아닙니다.
+- `AppPreferences.bottomNav`(키 `bottom_nav`, commit 실패 예외). 로컬 설정이며 DB/XLSX/ZIP에 넣지 않았습니다. 넣으려면 백업 코덱 호환을 먼저 설계하세요.
+- `MainActivity.render` 하단 바는 저장 구성을 그리고 길게 누르면 `customizeBottomNav`. 메뉴·하단은 `openNavTarget`을 공유합니다. 편집은 CategoryDrag 재사용, 저장에서만 기록, 취소/닫힘 시 `drag.cancel`. 기존 하단 접근성 설명(“○○ 탭”)을 유지해 기존 Android 검사가 그대로 동작합니다.
+- 새 아이콘 budget/trend/wallet/split(IconView). 라벨은 최대5자(BottomNavTests가 검사).
+- 이 작업 환경에는 Android SDK 빌드 도구·원본 키·기기가 없었습니다. JVM1,788개 통과, 앱·Android 검사 소스는 공개 AOSP android-36 jar로 javac 타입 검사만 했습니다. PC에서 build-local.ps1(원본 키)·test-core.ps1·에뮬레이터 `-Mode bottomnav`와 startup/back/settings/drag 회귀를 실행한 뒤 v1.0.0 Release를 게시하고 RELEASES.md 현재 배포 절·README를 실제 첨부와 대조해 갱신하세요. docs/BOTTOM_NAV_VALIDATION.md 참고.
 
 ## 0.9.2 일시적 앱 전환 복귀
 

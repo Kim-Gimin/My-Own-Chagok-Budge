@@ -7,6 +7,7 @@ $taskCoreFiles+="$PSScriptRoot\tests\LivingBudgetTests.java"
 $taskCoreFiles+="$PSScriptRoot\tests\TimeTests.java"
 $taskCoreFiles+="$PSScriptRoot\tests\CategoryOrderTests.java","$PSScriptRoot\app\src\main\java\kr\chagok\ledger\CategoryOrder.java"
 $taskCoreFiles+="$PSScriptRoot\tests\SpendingSpeedTests.java"
+$taskCoreFiles+="$PSScriptRoot\tests\BottomNavTests.java","$PSScriptRoot\app\src\main\java\kr\chagok\ledger\BottomNav.java"
 & "$Jdk\bin\javac.exe" -encoding UTF-8 -d $taskTestOutput $taskCoreFiles
 if($LASTEXITCODE -ne 0){throw 'Test compilation failed'}
 if($TemplateFile){
@@ -49,3 +50,6 @@ if($LASTEXITCODE -ne 0){throw "Category order checks failed"}
 
 & "$Jdk\bin\java.exe" -cp $taskTestOutput kr.chagok.ledger.SpendingSpeedTests
 if($LASTEXITCODE -ne 0){throw "Budget/total expense chart checks failed"}
+
+& "$Jdk\bin\java.exe" -cp $taskTestOutput kr.chagok.ledger.BottomNavTests
+if($LASTEXITCODE -ne 0){throw "Bottom navigation checks failed"}

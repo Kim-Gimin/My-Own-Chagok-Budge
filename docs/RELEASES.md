@@ -4,6 +4,7 @@
 
 | 버전 | code | 배포일 | 변경 | 공개 소스 | 릴리스 |
 |---|---:|---|---|---|---|
+| 1.0.0 | 32 | 2026-11-24 | [하단 메뉴 3~6개 선택·끌기 정렬·기본 배치](releases/1.0.0.md) | [v1.0.0](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v1.0.0) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v1.0.0) |
 | 0.9.2 | 31 | 2026-11-24 | [다른 앱 복귀 시 화면·입력 유지](releases/0.9.2.md) | [v0.9.2](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.9.2) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.2) |
 | 0.9.1 | 30 | 2026-11-23 | [예산 기준·전체 지출 그래프 동시 비교](releases/0.9.1.md) | [v0.9.1](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.9.1) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.1) |
 | 0.9.0 | 29 | 2026-11-23 | [지출 속도·예산 권장 속도선·전월 같은 기간 비교](releases/0.9.0.md) | [v0.9.0](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/tree/v0.9.0) | [보기](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.0) |
@@ -42,21 +43,24 @@
 
 ## 현재 배포 — 2026-11-24
 
-**최신 버전은 0.9.2 / versionCode31 / DB5**입니다. 0.1.0부터 총35개 버전·보관판이 등록되어 있으며 위 표는 최신 버전부터 정렬합니다.
+**소스 최신 버전은 1.0.0 / versionCode32 / DB5**입니다(하단 메뉴 편집). 1.0.0 APK는 원본 서명 키가 있는 PC에서 빌드·검사한 뒤 v1.0.0 Release로 게시합니다. **게시 전까지 설치용 최신 APK는 0.9.2**이며 GitHub Latest도 0.9.2입니다. 게시 후 이 절의 링크·검증 문구와 표의 총 개수(36개)를 실제 첨부 파일과 대조해 갱신하세요.
 
-- [0.9.2 APK 다운로드](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.2/chagok-0.9.2.apk)
-- [빈 엑셀 입력 양식](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.2/chagok-input-0.9.2.xlsx) · [공개 소스 ZIP](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.2/chagok-source-0.9.2.zip)
-- [파일 SHA256](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.2/SHA256SUMS.txt) · [전체 배포 파일](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.2)
+- 게시 예정: [v1.0.0 배포 파일](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v1.0.0)(chagok-1.0.0.apk · chagok-input-1.0.0.xlsx · chagok-source-1.0.0.zip · SHA256SUMS.txt)
+- 현재 설치용: [0.9.2 APK 다운로드](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.2/chagok-0.9.2.apk) · [0.9.2 전체 배포 파일](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.2)
 
-기존 0.8.14/0.9.0/0.9.1과 같은 서명 인증서를 사용합니다. 앱을 삭제하지 않고 APK를 설치해 업데이트하세요. 거래·계획·DB5·기존 백업 형식은 유지하며, 빈 입력 양식은0.9.1과 내용이 같습니다.
+1.0.0은 기존 0.8.14~0.9.2와 같은 서명 인증서로 빌드해야 앱 삭제 없이 업데이트됩니다. 거래·계획·DB5·기존 백업 형식은 유지하며, 빈 입력 양식은 0.9.2와 내용이 같습니다.
 
-검증은 빈 양식 포함 JVM1,484개와 APK 빌드·v2/v3 서명·패키지/버전 확인을 통과했습니다. Android 복귀 회귀 검사 소스도 컴파일했으며 실제 기기·에뮬레이터 실행은 미실시했습니다. [변경 파일·검증 범위와 한계](BACKGROUND_RESUME_VALIDATION.md)를 확인하세요.
+1.0.0 검증: 빈 양식 포함 JVM1,788개 통과, 앱·Android 검사 소스 타입 검사 통과. APK 빌드·서명·기기/에뮬레이터 실행은 아직입니다. [변경 파일·검증 범위와 한계](BOTTOM_NAV_VALIDATION.md). 0.9.2 배포 당시 검증은 [0.9.2 검증](BACKGROUND_RESUME_VALIDATION.md)에 있습니다.
 
 ## GitHub 릴리스 화면 순서 정정 — 2026-11-24
 
 사용자 승인으로 복구 태그0.7.0·0.8.0의 정렬용 날짜만 다른 과거 이관 태그와 맞췄습니다. 실제 GitHub 목록에서도0.8.13 → 0.8.12 → … → 0.8.0 → 0.7.1 → 0.7.0 순서를 확인했습니다. 태그 객체는 바뀌었지만 가리키는 소스 커밋·기존 릴리스·APK·첨부 파일·최신0.9.2는 유지합니다. 날짜는 실제 개발·복구 시각을 주장하는 값이 아닙니다. [적용·보존 검증과 기존 클론 안내](RELEASE_ORDER_VALIDATION.md).
 
 ## 최근 버전의 변경 내용
+
+### 1.0.0 — 하단 메뉴 편집
+
+설정·메뉴의 ‘하단 메뉴 편집’(또는 하단 메뉴 길게 누르기)에서 메뉴의 기능 10개 중 3~6개를 골라 하단에 놓고 끌어서 순서를 바꿉니다. 예산·목표·반복, 월별 추이, 기초자산, 저축 해지·배분도 넣을 수 있습니다. 저장해야 적용되고 취소하면 그대로이며, 기본 배치로 기존 6개를 되돌립니다. 업데이트 직후 배치는 0.9.2와 같습니다. [1.0.0 상세 안내](releases/1.0.0.md).
 
 ### 0.9.2 — 다른 앱 복귀 시 보던 화면 유지
 

@@ -22,3 +22,5 @@
 2026-11-24 사용자 승인 예외: v0.7.0/v0.8.0 주석 태그의 정렬용 날짜·설명만 정정했습니다. 소스 커밋은 유지했고 전후 태그 객체 SHA와 검증 결과는 docs/RELEASE_ORDER_VALIDATION.md에 있습니다. 다른 태그 변경에 대한 포괄 승인이 아닙니다.
 
 0.8.14 끌기 정렬은 CategoryDrag/CategoryOrder.moveTo/CategoryStore.reorder와 기존 COR1을 사용합니다. 행 제거 없이 이동 표시·드롭 한 번 저장·취소 시 미저장·끝/긴 행 경계·분리 시 콜백 정리를 유지합니다. 서명 비밀번호는 CHAGOK_KEYSTORE_PASSWORD 환경변수로만 전달하고 실제 값과 원본 패치를 커밋하지 않습니다.
+
+1.0.0 하단 메뉴는 BottomNav/AppPreferences.bottomNav(`bottom_nav`=BNV1)입니다. 기본6개는0.9.2 하단과 같아야 하고 3~6개·중복 금지·손상 시 기본을 유지합니다. 저장 버튼에서만 기록하고 취소는 미저장입니다. 설정·설명서는 후보에 넣지 않으며 메뉴에서 모든 기능을 계속 열 수 있어야 합니다. 백업·DB에 넣지 않습니다.

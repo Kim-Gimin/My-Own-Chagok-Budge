@@ -22,6 +22,9 @@ final class AppPreferences {
     Typeface typeface(String id){try{if("gothic".equals(id))return Typeface.createFromAsset(context.getAssets(),"fonts/NanumGothic-Regular.ttf");if("serif".equals(id))return Typeface.createFromAsset(context.getAssets(),"fonts/NanumMyeongjo-Regular.ttf");}catch(Exception ignored){}return Typeface.DEFAULT;}
     Set<String> homeMetrics(){return new HashSet<>(prefs.getStringSet("home_metrics",OverviewData.DEFAULT_METRICS));}
     void homeMetrics(Set<String> values){prefs.edit().putStringSet("home_metrics",new HashSet<>(values)).commit();}
+    /** 1.0.0 하단 메뉴 구성(BNV1). 로컬 설정이며 DB·백업 형식과 무관하다. 손상되면 기본 6개를 쓴다. */
+    List<String> bottomNav(){return BottomNav.parse(prefs.getString("bottom_nav",null));}
+    void bottomNav(List<String> ids){String value=BottomNav.encode(ids);if(!prefs.edit().putString("bottom_nav",value).commit())throw new IllegalStateException("하단 메뉴 설정을 저장하지 못했어요.");}
     int recordSort(){return prefs.getInt("record_sort",HistoryData.DATE)==HistoryData.CATEGORY?HistoryData.CATEGORY:HistoryData.DATE;}
     void recordSort(int value){prefs.edit().putInt("record_sort",value).commit();}
     int statisticsMode(){int mode=prefs.getInt("statistics_mode",0);return mode>=0&&mode<=3?mode:0;}

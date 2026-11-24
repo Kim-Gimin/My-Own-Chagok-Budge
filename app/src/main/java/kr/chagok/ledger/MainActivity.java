@@ -254,12 +254,13 @@ public final class MainActivity extends Activity {
         if(tab==6||tab==9)return;
         line(root);
         LinearLayout nav=row(); nav.setPadding(dp(4),dp(8),dp(4),dp(8)); nav.setBackgroundColor(preferences.dark()?BG:SURFACE);
-        String[] names={"결산","통계","홈","달력","내역","엑셀"}, icons={"summary","pie","home","calendar","list","file"};int[] targets={4,2,5,0,1,3};
-        for(int i=0;i<6;i++) {
-            final int target=targets[i];boolean active=tab==target;int tint=active?(target==2?PINK:GREEN):MUTED;LinearLayout item=column(); item.setGravity(Gravity.CENTER); item.setPadding(0,dp(3),0,dp(3));
-            item.addView(new IconView(icons[i],tint),new LinearLayout.LayoutParams(dp(23),dp(23))); space(item,5);
-            TextView navLabel=text(names[i],11,tint,active); navLabel.setGravity(Gravity.CENTER); item.addView(navLabel); item.setContentDescription(names[i]+" 탭");item.setSelected(active);
-            item.setOnClickListener(v->navigate(target)); nav.addView(item,new LinearLayout.LayoutParams(0,dp(51),1));
+        // 1.0.0: 사용자가 고른 3~6개(BottomNav/BNV1). 저장값이 없거나 손상되면 0.9.2까지의 기본 6개.
+        List<String> navIds=preferences.bottomNav();int activeNav=BottomNav.activeIndex(navIds,tab);List<BottomNav.Item> navItems=BottomNav.items(navIds);
+        for(int i=0;i<navItems.size();i++) {
+            final BottomNav.Item entry=navItems.get(i);boolean active=i==activeNav;int tint=active?(entry.target==2?PINK:GREEN):MUTED;LinearLayout item=column(); item.setGravity(Gravity.CENTER); item.setPadding(0,dp(3),0,dp(3));
+            item.addView(new IconView(entry.icon,tint),new LinearLayout.LayoutParams(dp(23),dp(23))); space(item,5);
+            TextView navLabel=text(entry.label,11,tint,active); navLabel.setGravity(Gravity.CENTER);navLabel.setSingleLine(true);navLabel.setEllipsize(TextUtils.TruncateAt.END); item.addView(navLabel,new LinearLayout.LayoutParams(-1,-2)); item.setContentDescription(entry.screen()?entry.label+" 탭":entry.menuName+" 열기");item.setSelected(active);
+            item.setOnClickListener(v->openNavTarget(entry.target));item.setOnLongClickListener(v->{customizeBottomNav();return true;}); nav.addView(item,new LinearLayout.LayoutParams(0,dp(51),1));
         }
         root.addView(nav);
     }
@@ -270,7 +271,59 @@ public final class MainActivity extends Activity {
     private LinearLayout.LayoutParams headerIconParams(){return new LinearLayout.LayoutParams(dp(HEADER_TOUCH),dp(HEADER_TOUCH));}
     private android.graphics.drawable.Drawable headerRipple(){GradientDrawable mask=new GradientDrawable();mask.setShape(GradientDrawable.OVAL);mask.setColor(Color.WHITE);return new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(preferences.dark()?0x33FFFFFF:0x1F000000),null,mask);}
     private void navigate(int target){dismissExitDialog();hideKeyboard();if(target==1)recordsAll=true;if(target==0&&tab!=0)resetCalendarToday();tab=target;displayLimit=100;render();}
-    private void showMenu(){String[] names={"저축 해지·배분","기초자산·현재 보유","결산","원형·막대 통계","월별 추이·전월 비교","예산·목표·반복·자주 쓰는 기록","홈","달력","내역","엑셀 백업·가져오기","설정"};int[] targets={-1,-2,4,2,8,7,5,0,1,3,6};new AlertDialog.Builder(this).setTitle("메뉴").setItems(names,(d,i)->{if(targets[i]==-2)openingList();else if(targets[i]<0)movementList();else navigate(targets[i]);}).setNegativeButton("닫기",null).show();}
+    private static final int OPEN_BOTTOM_NAV_EDITOR=-3;
+    private void showMenu(){String[] names={"저축 해지·배분","기초자산·현재 보유","결산","원형·막대 통계","월별 추이·전월 비교","예산·목표·반복·자주 쓰는 기록","홈","달력","내역","엑셀 백업·가져오기","하단 메뉴 편집","설정"};int[] targets={BottomNav.OPEN_MOVEMENT,BottomNav.OPEN_OPENING,4,2,8,7,5,0,1,3,OPEN_BOTTOM_NAV_EDITOR,6};new AlertDialog.Builder(this).setTitle("메뉴").setItems(names,(d,i)->{if(targets[i]==OPEN_BOTTOM_NAV_EDITOR)customizeBottomNav();else openNavTarget(targets[i]);}).setNegativeButton("닫기",null).show();}
+    /** 메뉴와 하단 메뉴가 같은 동작을 쓴다. 음수는 대화상자로 여는 기능이다. */
+    private void openNavTarget(int target){if(target==BottomNav.OPEN_OPENING)openingList();else if(target==BottomNav.OPEN_MOVEMENT)movementList();else if(target>=0)navigate(target);}
+    /** 하단 메뉴 편집: 3~6개 선택, 끌어서 순서 변경, 기본 배치 복원. 저장을 눌러야 적용되고 취소하면 바뀌지 않는다. */
+    private void customizeBottomNav(){
+        if(busy){toast("진행 중인 작업이 끝난 뒤 다시 시도해 주세요.");return;}
+        final List<String> saved=preferences.bottomNav(),draft=new ArrayList<>(saved);
+        LinearLayout form=column();form.setPadding(dp(18),dp(8),dp(18),dp(8));
+        TextView hint=label("메뉴에 있는 기능을 "+BottomNav.MIN+"~"+BottomNav.MAX+"개 골라 하단에 놓아요. 왼쪽 ≡ 손잡이를 끌거나 이름을 길게 눌러 순서를 바꾸세요. 하단에서 뺀 기능도 왼쪽 위 메뉴에서 열 수 있어요.",12,MUTED);hint.setLineSpacing(dp(2),1);form.addView(hint);space(form,10);
+        LinearLayout preview=row();preview.setPadding(dp(2),dp(7),dp(2),dp(7));GradientDrawable previewBg=bg(preferences.dark()?BG:SURFACE,12);previewBg.setStroke(dp(1),LINE);preview.setBackground(previewBg);form.addView(preview,new LinearLayout.LayoutParams(-1,-2));space(form,8);
+        TextView count=label("",12,MUTED);form.addView(count);space(form,4);
+        LinearLayout content=column(),chosen=column(),others=column();ScrollView scroll=new ScrollView(this);scroll.setContentDescription("하단 메뉴 편집 목록");
+        content.addView(chosen);TextView othersTitle=text("추가할 수 있는 기능",13,MUTED,true);othersTitle.setPadding(dp(4),dp(14),0,dp(4));content.addView(othersTitle);content.addView(others);scroll.addView(content);form.addView(scroll);
+        GradientDrawable lifted=bg(SURFACE,12);lifted.setStroke(dp(1),LINE);
+        final Runnable[] refresh={null};
+        CategoryDrag drag=new CategoryDrag(scroll,chosen,dp(44),lifted,dp(6),(from,to)->{List<String> moved=BottomNav.moveTo(draft,from,to);draft.clear();draft.addAll(moved);refresh[0].run();});
+        refresh[0]=()->{
+            int scrollY=scroll.getScrollY();List<BottomNav.Item> items=BottomNav.items(draft);boolean canRemove=BottomNav.canRemove(draft),canAdd=BottomNav.canAdd(draft);
+            preview.removeAllViews();StringBuilder spoken=new StringBuilder("하단 메뉴 미리보기: ");
+            for(int i=0;i<items.size();i++){BottomNav.Item it=items.get(i);LinearLayout cell=column();cell.setGravity(Gravity.CENTER);cell.addView(new IconView(it.icon,MUTED),new LinearLayout.LayoutParams(dp(20),dp(20)));space(cell,4);TextView name=text(it.label,10,MUTED,false);name.setGravity(Gravity.CENTER);name.setSingleLine(true);name.setEllipsize(TextUtils.TruncateAt.END);cell.addView(name,new LinearLayout.LayoutParams(-1,-2));cell.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);preview.addView(cell,new LinearLayout.LayoutParams(0,dp(42),1));spoken.append(i>0?", ":"").append(it.label);}
+            preview.setContentDescription(spoken.toString());
+            count.setText("하단 메뉴 "+items.size()+"개 · 최소 "+BottomNav.MIN+"개, 최대 "+BottomNav.MAX+"개"+(draft.equals(saved)?"":" · 저장 전"));
+            chosen.removeAllViews();
+            for(int i=0;i<items.size();i++){
+                BottomNav.Item it=items.get(i);LinearLayout r=row();r.setTag(it.id);r.setPadding(0,dp(2),0,dp(2));r.setFocusable(true);r.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);r.setContentDescription("하단 "+(i+1)+"번째 "+it.menuName+", 끌어서 순서 변경");
+                ImageView grip=new ImageView(this);grip.setImageDrawable(new CategoryDrag.Grip(MUTED,dp(1)));grip.setScaleType(ImageView.ScaleType.CENTER);grip.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);r.addView(grip,new LinearLayout.LayoutParams(dp(44),dp(48)));
+                IconView icon=new IconView(it.icon,INK);icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);LinearLayout.LayoutParams iconSize=new LinearLayout.LayoutParams(dp(22),dp(22));iconSize.rightMargin=dp(10);r.addView(icon,iconSize);
+                // 툴팁 없음: 끌기를 시작하는 길게 누르기를 가로채지 않도록 한다.
+                TextView title=text(it.menuName,14,INK,true);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);r.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+                drag.attach(r,i,items.size(),it.menuName+" 앞으로 이동",it.menuName+" 뒤로 이동");
+                TextView remove=categoryAction("빼기",()->{if(drag.busy())return;if(!BottomNav.canRemove(draft)){toast("하단 메뉴는 최소 "+BottomNav.MIN+"개가 필요해요.");return;}List<String> next=BottomNav.remove(draft,it.id);draft.clear();draft.addAll(next);refresh[0].run();});
+                remove.setTextColor(canRemove?RED:MUTED);remove.setContentDescription(it.menuName+" 하단에서 빼기"+(canRemove?"":", 최소 개수라 뺄 수 없음"));r.addView(remove,new LinearLayout.LayoutParams(dp(54),dp(48)));chosen.addView(r);
+            }
+            others.removeAllViews();List<String> rest=BottomNav.available(draft);othersTitle.setVisibility(rest.isEmpty()?View.GONE:View.VISIBLE);
+            for(String id:rest){
+                BottomNav.Item it=BottomNav.item(id);LinearLayout r=row();r.setTag(it.id);r.setPadding(0,dp(2),0,dp(2));
+                LinearLayout.LayoutParams iconSize=new LinearLayout.LayoutParams(dp(22),dp(22));iconSize.leftMargin=dp(11);iconSize.rightMargin=dp(21);IconView icon=new IconView(it.icon,MUTED);icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);r.addView(icon,iconSize);
+                TextView title=text(it.menuName,14,MUTED,false);title.setMaxLines(2);title.setEllipsize(TextUtils.TruncateAt.END);r.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+                TextView add=categoryAction("추가",()->{if(drag.busy())return;if(!BottomNav.canAdd(draft)){toast("하단 메뉴는 최대 "+BottomNav.MAX+"개예요. 먼저 하나를 빼 주세요.");return;}List<String> next=BottomNav.add(draft,it.id);draft.clear();draft.addAll(next);refresh[0].run();scroll.post(()->scroll.smoothScrollTo(0,0));});
+                add.setTextColor(canAdd?GREEN:MUTED);add.setContentDescription(it.menuName+" 하단에 추가"+(canAdd?"":", 최대 개수라 먼저 하나를 빼야 함"));r.addView(add,new LinearLayout.LayoutParams(dp(54),dp(48)));others.addView(r);
+            }
+            int maxHeight=Math.max(dp(160),Math.min(dp(380),getResources().getDisplayMetrics().heightPixels*45/100));scroll.setLayoutParams(new LinearLayout.LayoutParams(-1,Math.min(maxHeight,dp(BottomNav.ITEMS.size()*54+48))));
+            scroll.post(()->scroll.scrollTo(0,scrollY));
+        };
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("하단 메뉴 편집").setView(form).setNegativeButton("취소",null).setNeutralButton("기본 배치",null).setPositiveButton("저장",null).create();
+        dialog.setOnDismissListener(d->drag.cancel());
+        dialog.setOnShowListener(d->{
+            dialog.getButton(-3).setOnClickListener(v->{if(drag.busy())return;draft.clear();draft.addAll(BottomNav.DEFAULT);refresh[0].run();scroll.post(()->scroll.scrollTo(0,0));toast("기본 배치로 바꿨어요. 저장을 눌러야 적용돼요.");});
+            dialog.getButton(-1).setOnClickListener(v->{if(drag.busy())return;if(draft.equals(saved)){dialog.dismiss();return;}try{preferences.bottomNav(new ArrayList<>(draft));}catch(Exception ex){error("하단 메뉴를 저장하지 못했어요",message(ex));return;}dialog.dismiss();restoredPageScrollY=pageScroll==null?-1:pageScroll.getScrollY();render();toast("하단 메뉴를 저장했어요.");});
+        });
+        refresh[0].run();dialog.show();
+    }
     private void settlements(){
         LinearLayout controls=column();controls.setPadding(dp(18),0,dp(18),dp(12));LinearLayout tabs=row();
         String[] names={"연간 결산","종합 결산","기간 결산"};
@@ -303,6 +356,7 @@ public final class MainActivity extends Activity {
         settingItem("예산·목표·반복 관리","예산, 납입 목표와 자주 쓰는 기록을 관리해요.",()->navigate(7));
         settingItem("월별 추이·전월 비교","최근 6개월 또는 12개월의 네 유형을 비교해요.",()->navigate(8));
         space(page,16);settingItem("홈 화면 커스텀","오늘·이번 주·이번 달·올해·전체의 수입, 지출, 저축, 투자, 합계를 골라 표시해요.",this::customizeHome);
+        settingItem("하단 메뉴 편집","메뉴의 기능을 3~6개 골라 하단에 놓고 끌어서 순서를 바꿔요. 하단 메뉴를 길게 눌러도 열려요.",this::customizeBottomNav);
         settingItem("상세 분류 관리","수입·지출·저축·투자 분류를 추가하고 끌어서 순서를 바꿔요. 삭제·복원도 할 수 있어요.",()->manageCategories("지출",null));
         settingItem("시작 화면 설정","기본 시작 화면은 홈이에요. 원하는 시작 화면으로 바꿀 수 있어요.",this::chooseStartScreen);
         settingItem("폰트 설정","휴대폰 기본 글꼴, 나눔고딕, 나눔명조를 선택해요.",this::chooseFont);
@@ -1043,6 +1097,10 @@ public final class MainActivity extends Activity {
             else if(kind.equals("menu")){raw.drawLine(4,6,20,6,p);raw.drawLine(4,12,20,12,p);raw.drawLine(4,18,20,18,p);}
             else if(kind.equals("back")){Path chevron=new Path();chevron.moveTo(15,4.5f);chevron.lineTo(7.5f,12);chevron.lineTo(15,19.5f);raw.drawPath(chevron,p);}
             else if(kind.equals("search")){raw.drawCircle(10,10,6,p);raw.drawLine(14.5f,14.5f,21,21,p);}
+            else if(kind.equals("budget")){raw.drawCircle(12,12,9.5f,p);raw.drawCircle(12,12,5,p);p.setStyle(Paint.Style.FILL);raw.drawCircle(12,12,1.6f,p);}
+            else if(kind.equals("trend")){Path line=new Path();line.moveTo(2.5f,18);line.lineTo(8.5f,11.5f);line.lineTo(13,15.5f);line.lineTo(21,6.5f);raw.drawPath(line,p);Path head=new Path();head.moveTo(15.5f,6.5f);head.lineTo(21,6.5f);head.lineTo(21,12);raw.drawPath(head,p);raw.drawLine(2.5f,22,21.5f,22,p);}
+            else if(kind.equals("wallet")){raw.drawRoundRect(2.5f,6,21.5f,21,3,3,p);raw.drawLine(5,6,16,2.5f,p);raw.drawRoundRect(14,11,21.5f,16,1.5f,1.5f,p);p.setStyle(Paint.Style.FILL);raw.drawCircle(17,13.5f,1,p);}
+            else if(kind.equals("split")){raw.drawLine(12,22,12,13,p);raw.drawLine(12,13,5,4,p);raw.drawLine(12,13,19,4,p);Path left=new Path();left.moveTo(5,9);left.lineTo(5,4);left.lineTo(10,4);raw.drawPath(left,p);Path right=new Path();right.moveTo(14,4);right.lineTo(19,4);right.lineTo(19,9);raw.drawPath(right,p);}
             else {p.setStyle(Paint.Style.FILL);raw.drawRoundRect(1,3,23,7,1.5f,1.5f,p);raw.drawRoundRect(1,10,19,14,1.5f,1.5f,p);raw.drawRoundRect(1,17,15,21,1.5f,1.5f,p);}
             raw.restore();}
     }
