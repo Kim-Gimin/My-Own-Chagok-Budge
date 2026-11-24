@@ -29,13 +29,13 @@ DB 스키마·마이그레이션, 거래/계획/기초자산/이동, XLSX/ZIP �
 - 설정(6)·설명서(9)는 후보가 아닙니다. 두 화면은 원래 하단 바를 숨기고, 설정은 모든 화면의 상단 톱니로 열립니다.
 - 하단에서 뺀 기능도 왼쪽 위 메뉴에 남습니다. 시작 화면 설정·뒤로 가기·PIN·백그라운드 복귀·파일 선택 복귀 흐름은 변경하지 않았습니다.
 
-## 실행한 검사
+## 클라우드 작업 당시 실행한 검사
 
 - 변경 전: JVM 1,484개(빈 양식 0.9.2 포함) 통과.
 - 변경 후: JVM 1,788개 = 기존 1,484 + BottomNavTests 304(빈 양식 1.0.0 포함) 통과. OpenJDK 17, Linux.
 - 앱 전체 소스와 `tests/android/*.java`를 공개 AOSP `android-36` android.jar(숨김 API 포함 비공식 배포본)로 javac `-source 8 -target 8` 타입 검사 통과. 이 jar에는 `android.view.InputFilter`가 따로 있어 기존 `InputFilter` 참조가 모호해지므로, 검사용 임시 복사본에서만 `android.text.InputFilter`로 바꿔 컴파일했습니다. 저장소 소스는 바꾸지 않았으며 공식 SDK에서는 기존처럼 문제없습니다.
 
-## 실행하지 못한 검사(PC에서 필요)
+## 클라우드 작업 당시 미실시(후속 PC 결과는 아래)
 
 1. `build-local.ps1`(원본 키, `CHAGOK_KEYSTORE_PASSWORD`)로 1.0.0 APK 빌드·apksigner 인증서가 0.9.2와 같은지 확인.
 2. `test-core.ps1 -TemplateFile templates/chagok-input-1.0.0.xlsx`.
@@ -54,4 +54,12 @@ DB 스키마·마이그레이션, 거래/계획/기초자산/이동, XLSX/ZIP �
 - 빈 양식 SHA256: `d834905339c48acd254ba6a7a363897fe8033ac9167be2712b8057b79de8be1c`(0.9.2와 동일).
 - Android 검사 Java 소스 14개를 공식 SDK36으로 컴파일했습니다. `test-android.ps1`의 ValidateSet에 빠진 `bottomnav`를 추가했고 PowerShell 구문 검사와 모드 허용을 확인했습니다. 앱 소스 추가 변경은 없습니다.
 - 사용자가 다운로드 용량 안내 후 에뮬레이터 설치 없이 APK까지만 진행하도록 선택했습니다. `bottomnav`, `startup`, `back`, `settings`, `drag` 실행, 다크/큰 글꼴 라벨 확인, 0.9.2 → 1.0.0 업데이트 설치 검사는 미실시입니다. 컴파일 통과를 Android 실행 통과로 간주하지 않습니다.
-- main 병합·v1.0.0 태그·Release 게시는 수행하지 않았습니다. 공개 최신 APK는 여전히 0.9.2이며 이번 APK는 Android 실행 검사 전 후보 파일입니다. 실제 사용자 폰·개인 장부·백업은 사용하지 않았습니다.
+- 이 PC 검사 직후에는 사용자 선택에 따라 APK까지만 만들고 main 병합·태그·Release를 보류했습니다. 이후 사용자 배포 요청으로 아래 게시를 진행했습니다. 실제 사용자 폰·개인 장부·백업은 사용하지 않았습니다.
+
+## GitHub 게시 확인 — 2026-11-24
+
+- Android 실행 검사를 생략한 상태로 기존처럼 배포하라는 사용자 요청에 따라 main을 fast-forward하고 새 주석 태그 `v1.0.0`을 만들었습니다. 배포 소스 커밋은 `2243ece65797a6c22d92a8d6d31e4b2d3ad53338`입니다. APK의 앱 소스는 빌드·검증한 버전과 같습니다.
+- [v1.0.0 Release](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v1.0.0)를 Latest로 게시했습니다. 총36개 릴리스이며 기존35개 릴리스 ID·본문·공개 시각·첨부 파일의 ID/이름/크기/SHA256을 보존했습니다. 과거 태그는 변경하지 않았습니다.
+- 첨부4개: `chagok-1.0.0.apk`, `chagok-input-1.0.0.xlsx`, `chagok-source-1.0.0.zip`, `SHA256SUMS.txt`. GitHub 첨부의 크기·SHA256이 로컬 파일과 일치합니다. 소스 ZIP은 Git 추적 파일만으로 만들었으며 키·패치·APK·빌드 폴더·개인 파일을 넣지 않았습니다.
+- 소스 ZIP SHA256: `aaeac240a114568b99cdd53e1ed9cb1a60db3e45ec4b277361174bc96179beaf`. APK·양식 SHA256은 위 PC 검증과 같습니다.
+- Android 실행·다크/큰 글꼴·업데이트 설치 검사는 계속 미실시입니다. 릴리스 본문과 문서에도 같은 범위를 표시했습니다. 게시 후 갱신은 문서만 커밋하며 앱 버전·배포 APK·태그를 바꾸지 않습니다.

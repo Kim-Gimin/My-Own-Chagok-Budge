@@ -1,6 +1,6 @@
 # 다른 AI/PC 개발 인계 — 2026-11-24
 
-대상 저장소: https://github.com/Kim-Gimin/My-Own-Chagok-Budge. 소스 최신 앱1.0.0/code32/DB5(하단 메뉴 편집)입니다. 1.0.0 APK·Release는 아직 게시 전이며 게시된 최신은0.9.2입니다. 예산 기준·전체 지출 그래프 동시 비교와 상세 분류 끌기 정렬을 지원합니다.
+대상 저장소: https://github.com/Kim-Gimin/My-Own-Chagok-Budge. 최신 공개 앱1.0.0/code32/DB5(하단 메뉴 편집)이며 GitHub Latest는 v1.0.0입니다. 총36개 릴리스, v1.0.0 첨부는 APK·빈 양식·소스 ZIP·SHA256SUMS.txt 네 개입니다. 예산 기준·전체 지출 그래프 동시 비교와 상세 분류 끌기 정렬을 지원합니다.
 
 1. `README.md`, `FEATURES.md`, `AGENTS.md`, `VALIDATION.md`, `docs/DATA_SAFETY.md`를 먼저 읽으세요.
 2. `main`에서 새 작업 브랜치를 만들고 요청받은 항목만 한 번에 하나씩 작업하세요. 기존 사용자의 DB/원금/설정과 백업 호환을 보존하세요.
@@ -14,12 +14,13 @@
 
 ## 1.0.0 하단 메뉴 편집
 
-- Windows PC 추가 검증(2026-11-24): 지정 패치 적용·기능 브랜치 push, JVM1,788개, 원본 서명 APK 빌드, 공개0.9.2와 인증서 일치 및 package/code32/name1.0.0 확인을 마쳤습니다. Android 검사 소스14개는 공식 SDK36으로 컴파일했습니다. `test-android.ps1` ValidateSet의 `bottomnav` 누락만 보완했습니다. 사용자가 에뮬레이터 설치 없이 APK까지만 선택해 Android 실행·다크/큰 글꼴·업데이트 설치는 미실시이며 main 병합·태그·Release는 하지 않았습니다. 아래 클라우드 검증과 구분하고 `docs/BOTTOM_NAV_VALIDATION.md`의 PC 결과를 읽으세요.
+- Windows PC 추가 검증·게시(2026-11-24): 지정 패치 적용, JVM1,788개, 원본 서명 APK 빌드, 공개0.9.2와 인증서 일치 및 package/code32/name1.0.0 확인을 마쳤습니다. Android 검사 소스14개는 공식 SDK36으로 컴파일했습니다. `test-android.ps1` ValidateSet의 `bottomnav` 누락만 보완했습니다. 사용자가 에뮬레이터 설치를 생략했고 이후 기존처럼 배포하도록 요청해, 미실시 범위를 명시하고 main fast-forward·주석 태그v1.0.0·Latest Release 게시를 완료했습니다. Android 실행·다크/큰 글꼴·업데이트 설치는 계속 미실시입니다. 아래 클라우드 검증과 구분하고 `docs/BOTTOM_NAV_VALIDATION.md`의 PC·게시 결과를 읽으세요.
+- 배포 소스/주석 태그는 `2243ece65797a6c22d92a8d6d31e4b2d3ad53338`이며 게시 후 문서 갱신은 main의 별도 커밋입니다. Release4개 첨부의 SHA256·크기가 로컬과 일치하고 기존35개 릴리스 ID/본문/공개 시각/첨부 파일은 유지됨을 확인했습니다. 원본 키·패치·빌드 폴더·개인 파일은 첨부하지 않았습니다. 앱 코드는 검증 APK 빌드 때와 같아 문서 변경으로 재빌드·버전 증가하지 않았습니다.
 - 새 `BottomNav`(순수 Java): 후보10개(화면 4/2/5/0/1/3/7/8, 대화상자 기초자산-2·해지배분-1), 기본6개=0.9.2 하단, 3~6개·중복 금지, `BNV1:` 코덱, 손상 시 기본. 설정6·설명서9는 후보가 아닙니다.
 - `AppPreferences.bottomNav`(키 `bottom_nav`, commit 실패 예외). 로컬 설정이며 DB/XLSX/ZIP에 넣지 않았습니다. 넣으려면 백업 코덱 호환을 먼저 설계하세요.
 - `MainActivity.render` 하단 바는 저장 구성을 그리고 길게 누르면 `customizeBottomNav`. 메뉴·하단은 `openNavTarget`을 공유합니다. 편집은 CategoryDrag 재사용, 저장에서만 기록, 취소/닫힘 시 `drag.cancel`. 기존 하단 접근성 설명(“○○ 탭”)을 유지해 기존 Android 검사가 그대로 동작합니다.
 - 새 아이콘 budget/trend/wallet/split(IconView). 라벨은 최대5자(BottomNavTests가 검사).
-- 이 작업 환경에는 Android SDK 빌드 도구·원본 키·기기가 없었습니다. JVM1,788개 통과, 앱·Android 검사 소스는 공개 AOSP android-36 jar로 javac 타입 검사만 했습니다. PC에서 build-local.ps1(원본 키)·test-core.ps1·에뮬레이터 `-Mode bottomnav`와 startup/back/settings/drag 회귀를 실행한 뒤 v1.0.0 Release를 게시하고 RELEASES.md 현재 배포 절·README를 실제 첨부와 대조해 갱신하세요. docs/BOTTOM_NAV_VALIDATION.md 참고.
+- 클라우드 작업 당시에는 Android SDK 빌드 도구·원본 키·기기가 없었습니다. 그때 JVM1,788개와 공개 AOSP android-36 jar javac 타입 검사만 통과했습니다. 후속 PC의 공식 SDK 빌드·컴파일·서명 검증 및 게시 결과는 위와 같습니다. 아직 필요한 검사는 전용 에뮬레이터 `-Mode bottomnav`와 startup/back/settings/drag, 다크/큰 글꼴 및 업데이트 설치입니다. 실제 사용자 폰에 초기화 검사를 실행하지 마세요. docs/BOTTOM_NAV_VALIDATION.md 참고.
 
 ## 0.9.2 일시적 앱 전환 복귀
 

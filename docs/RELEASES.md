@@ -43,14 +43,14 @@
 
 ## 현재 배포 — 2026-11-24
 
-**소스 최신 버전은 1.0.0 / versionCode32 / DB5**입니다(하단 메뉴 편집). 1.0.0 APK는 원본 서명 키가 있는 PC에서 빌드·검사한 뒤 v1.0.0 Release로 게시합니다. **게시 전까지 설치용 최신 APK는 0.9.2**이며 GitHub Latest도 0.9.2입니다. 게시 후 이 절의 링크·검증 문구와 표의 총 개수(36개)를 실제 첨부 파일과 대조해 갱신하세요.
+**최신 공개 버전은 1.0.0 / versionCode32 / DB5**입니다(하단 메뉴 편집). 원본 서명 APK를 v1.0.0 Release에 게시했고 GitHub Latest도 v1.0.0입니다. 공개 릴리스는 총36개이며 실제 첨부 파일 4개의 이름·크기·SHA256을 로컬 배포 파일과 대조했습니다.
 
-- 게시 예정: [v1.0.0 배포 파일](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v1.0.0)(chagok-1.0.0.apk · chagok-input-1.0.0.xlsx · chagok-source-1.0.0.zip · SHA256SUMS.txt)
-- 현재 설치용: [0.9.2 APK 다운로드](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v0.9.2/chagok-0.9.2.apk) · [0.9.2 전체 배포 파일](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v0.9.2)
+- [1.0.0 APK 다운로드](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v1.0.0/chagok-1.0.0.apk) · [전체 배포 파일](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/tag/v1.0.0)
+- [빈 입력 양식](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v1.0.0/chagok-input-1.0.0.xlsx) · [소스 ZIP](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v1.0.0/chagok-source-1.0.0.zip) · [SHA256 목록](https://github.com/Kim-Gimin/My-Own-Chagok-Budge/releases/download/v1.0.0/SHA256SUMS.txt)
 
-1.0.0은 기존 0.8.14~0.9.2와 같은 서명 인증서로 빌드해야 앱 삭제 없이 업데이트됩니다. 거래·계획·DB5·기존 백업 형식은 유지하며, 빈 입력 양식은 0.9.2와 내용이 같습니다.
+1.0.0은 기존 공개 0.9.2 APK와 같은 서명 인증서로 빌드해 앱 삭제 없이 업데이트할 수 있습니다. 거래·계획·DB5·기존 백업 형식은 유지하며, 빈 입력 양식은 0.9.2와 내용이 같습니다. v1.0.0 주석 태그·소스 ZIP의 커밋은 `2243ece65797a6c22d92a8d6d31e4b2d3ad53338`입니다. 게시 후 문서 갱신 커밋은 태그와 별도입니다.
 
-1.0.0 검증: 빈 양식 포함 JVM1,788개 통과, 앱·Android 검사 소스 타입 검사 통과. APK 빌드·서명·기기/에뮬레이터 실행은 아직입니다. [변경 파일·검증 범위와 한계](BOTTOM_NAV_VALIDATION.md). 0.9.2 배포 당시 검증은 [0.9.2 검증](BACKGROUND_RESUME_VALIDATION.md)에 있습니다.
+1.0.0 검증: 빈 양식 포함 JVM1,788개, 원본 키 APK 빌드·v2/v3 서명, 공개0.9.2와 인증서 일치, 패키지/code32/name1.0.0 확인을 통과했습니다. Android 검사 소스14개는 공식 SDK36으로 컴파일했습니다. Android 실행(bottomnav/startup/back/settings/drag)·다크/큰 글꼴·0.9.2→1.0.0 업데이트 설치는 미실시입니다. [변경 파일·검증 범위와 한계](BOTTOM_NAV_VALIDATION.md). 0.9.2 배포 당시 검증은 [0.9.2 검증](BACKGROUND_RESUME_VALIDATION.md)에 있습니다.
 
 ## GitHub 릴리스 화면 순서 정정 — 2026-11-24
 
@@ -108,6 +108,6 @@
 
 ### 과거 릴리스 등록 — 2026-11-22 당시 기록
 
-과거 소스 보관 릴리스28개를 추가해 **당시 총31개, 최신0.8.13**이었습니다. 이 수치는 그날 작업 결과입니다. 이후0.8.14·0.9.0·0.9.1·0.9.2가 추가되어 **현재는 총35개, 최신0.9.2**입니다. [당시 등록 검증](RELEASE_HISTORY_VALIDATION.md)을 참조하세요.
+과거 소스 보관 릴리스28개를 추가해 **당시 총31개, 최신0.8.13**이었습니다. 이 수치는 그날 작업 결과입니다. 이후0.8.14·0.9.0·0.9.1·0.9.2·1.0.0이 추가되어 **현재는 총36개, 최신1.0.0**입니다. [당시 등록 검증](RELEASE_HISTORY_VALIDATION.md)을 참조하세요.
 
 0.8.10 이전 릴리스는 소스 보관용이며 GitHub Source code ZIP/tar.gz와 변경 내용을 제공합니다. 설치용 APK는0.8.11 이후 공개 배포물에서 받을 수 있습니다. 0.6.2 변형판은 설치 앱의 versionName/code가 같아도 보관 이름으로 구분합니다. 실제 사례가 포함된 과거 원본 APK·엑셀, 개인 장부·백업·서명키는 공개하지 않습니다.

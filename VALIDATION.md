@@ -1,6 +1,6 @@
 # 검증 — 1.0.0 하단 메뉴 편집
 
-1.0.0 / versionCode32 / DB5. 변경 전 JVM1,484개(빈 양식 포함) 통과, 변경 후 1,788개(기존1,484 + BottomNavTests304) 통과. 앱 소스와 Android 회귀 검사(새 BottomNavChecks 포함)는 공개 AOSP API36 클래스로 javac 타입 검사만 했습니다. 원본 서명 APK 빌드와 기기/에뮬레이터 실행은 이 작업 환경에 SDK 빌드 도구·서명키·기기가 없어 미실시입니다.
+1.0.0 / versionCode32 / DB5. 변경 전 JVM1,484개(빈 양식 포함), 변경 후 Windows JDK17에서 1,788개(기존1,484 + BottomNavTests304)를 통과했습니다. 원본 키 APK 빌드·v2/v3 서명, 공개0.9.2와 인증서 일치, 패키지/code32/name1.0.0을 확인했습니다. Android 회귀 검사 소스14개(새 BottomNavChecks 포함)는 공식 SDK36으로 컴파일했습니다. Android 실행(bottomnav/startup/back/settings/drag)·다크/큰 글꼴 라벨·0.9.2→1.0.0 업데이트 설치 검사는 사용자 선택으로 미실시입니다. v1.0.0을 GitHub Latest로 게시했고 첨부4개의 SHA256과 총36개 릴리스를 확인했습니다.
 
 [변경 파일·검증과 한계](docs/BOTTOM_NAV_VALIDATION.md). 실제 사용자 폰·장부는 검사에 사용하지 않았습니다.
 
