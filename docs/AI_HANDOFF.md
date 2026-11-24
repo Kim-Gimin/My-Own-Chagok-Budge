@@ -14,6 +14,7 @@
 
 ## 1.0.0 하단 메뉴 편집
 
+- Windows PC 추가 검증(2026-11-24): 지정 패치 적용·기능 브랜치 push, JVM1,788개, 원본 서명 APK 빌드, 공개0.9.2와 인증서 일치 및 package/code32/name1.0.0 확인을 마쳤습니다. Android 검사 소스14개는 공식 SDK36으로 컴파일했습니다. `test-android.ps1` ValidateSet의 `bottomnav` 누락만 보완했습니다. 사용자가 에뮬레이터 설치 없이 APK까지만 선택해 Android 실행·다크/큰 글꼴·업데이트 설치는 미실시이며 main 병합·태그·Release는 하지 않았습니다. 아래 클라우드 검증과 구분하고 `docs/BOTTOM_NAV_VALIDATION.md`의 PC 결과를 읽으세요.
 - 새 `BottomNav`(순수 Java): 후보10개(화면 4/2/5/0/1/3/7/8, 대화상자 기초자산-2·해지배분-1), 기본6개=0.9.2 하단, 3~6개·중복 금지, `BNV1:` 코덱, 손상 시 기본. 설정6·설명서9는 후보가 아닙니다.
 - `AppPreferences.bottomNav`(키 `bottom_nav`, commit 실패 예외). 로컬 설정이며 DB/XLSX/ZIP에 넣지 않았습니다. 넣으려면 백업 코덱 호환을 먼저 설계하세요.
 - `MainActivity.render` 하단 바는 저장 구성을 그리고 길게 누르면 `customizeBottomNav`. 메뉴·하단은 `openNavTarget`을 공유합니다. 편집은 CategoryDrag 재사용, 저장에서만 기록, 취소/닫힘 시 `drag.cancel`. 기존 하단 접근성 설명(“○○ 탭”)을 유지해 기존 Android 검사가 그대로 동작합니다.

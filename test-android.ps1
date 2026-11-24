@@ -5,7 +5,7 @@ param(
     [Parameter(Mandatory=$true)][string]$Adb,
     [Parameter(Mandatory=$true)][string]$Serial,
     [string]$Keystore = "$PSScriptRoot\local-test.keystore",
-    [ValidateSet('drag','dragdark','order','orderreopen','orderdark','orderbefore','orderupgrade','timebefore','timeupgrade','time','timedark','full','upgrade','preview','revision','history','overlay','workflow','iconbaseline','icon','settings','investment','comparison','consistency','planning','recovery','recoverybaseline','recoveryupgrade','opening','assetguard','assetbaseline','assetupgrade','guide','guidebaseline','guideupgrade','reset','resetverify','back','backbefore','startup','startupbefore','living','livingdark','calendar','calendarbefore','categoriesbefore','categoriesupgrade','categories','calendarLiving','planselect')][string]$Mode='full'
+    [ValidateSet('bottomnav','drag','dragdark','order','orderreopen','orderdark','orderbefore','orderupgrade','timebefore','timeupgrade','time','timedark','full','upgrade','preview','revision','history','overlay','workflow','iconbaseline','icon','settings','investment','comparison','consistency','planning','recovery','recoverybaseline','recoveryupgrade','opening','assetguard','assetbaseline','assetupgrade','guide','guidebaseline','guideupgrade','reset','resetverify','back','backbefore','startup','startupbefore','living','livingdark','calendar','calendarbefore','categoriesbefore','categoriesupgrade','categories','calendarLiving','planselect')][string]$Mode='full'
 )
 $ErrorActionPreference='Stop'
 if([string]::IsNullOrWhiteSpace($env:CHAGOK_KEYSTORE_PASSWORD)){throw 'Set CHAGOK_KEYSTORE_PASSWORD in this process before signing; never commit signing secrets.'}

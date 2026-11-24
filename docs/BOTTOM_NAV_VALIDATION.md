@@ -43,3 +43,15 @@ DB 스키마·마이그레이션, 거래/계획/기초자산/이동, XLSX/ZIP �
 4. 실제 S23 Ultra에서 끌기 느낌·하단 길게 누르기 확인(초기화 검사 금지).
 
 실제 사용자 폰·개인 장부·백업은 사용하지 않았습니다.
+
+## Windows PC 추가 검증 — 2026-11-24
+
+- 제공 ZIP·패치의 SHA256과 패치 크기 88,439바이트, 기준 main `cd6b470`을 확인한 뒤 별도 클론에 적용했습니다. 변경 24개/새 파일 6개이며 기능 브랜치에만 push했습니다.
+- JDK17에서 `test-core.ps1 -TemplateFile templates/chagok-input-1.0.0.xlsx`: JVM 1,788개(기존 1,484 + BottomNavTests 304) 모두 통과했습니다.
+- 원본 키로 `build-local.ps1` 빌드 및 APK v2/v3 서명 검증을 통과했습니다. 공개 0.9.2 APK와 인증서 SHA256이 같습니다: `2c19ecb9444fe90c0c9ea83378655b0d76cb57c2b14ecf43774a53e3f962fcde`.
+- aapt2 확인: `kr.chagok.ledger`, versionName `1.0.0`, versionCode `32`, targetSdk `36`.
+- APK SHA256: `d164bbb1a978aeacfcbcec713245e5d2959f3db3f2897b8b48e216840ca5293c`.
+- 빈 양식 SHA256: `d834905339c48acd254ba6a7a363897fe8033ac9167be2712b8057b79de8be1c`(0.9.2와 동일).
+- Android 검사 Java 소스 14개를 공식 SDK36으로 컴파일했습니다. `test-android.ps1`의 ValidateSet에 빠진 `bottomnav`를 추가했고 PowerShell 구문 검사와 모드 허용을 확인했습니다. 앱 소스 추가 변경은 없습니다.
+- 사용자가 다운로드 용량 안내 후 에뮬레이터 설치 없이 APK까지만 진행하도록 선택했습니다. `bottomnav`, `startup`, `back`, `settings`, `drag` 실행, 다크/큰 글꼴 라벨 확인, 0.9.2 → 1.0.0 업데이트 설치 검사는 미실시입니다. 컴파일 통과를 Android 실행 통과로 간주하지 않습니다.
+- main 병합·v1.0.0 태그·Release 게시는 수행하지 않았습니다. 공개 최신 APK는 여전히 0.9.2이며 이번 APK는 Android 실행 검사 전 후보 파일입니다. 실제 사용자 폰·개인 장부·백업은 사용하지 않았습니다.
